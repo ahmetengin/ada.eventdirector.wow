@@ -1,0 +1,7 @@
+{
+  "name": "Event Director AI",
+  "description": "An AI-powered Event Director and 'Voice of God' for managing conferences and panels. It features a cinematic voice for announcements, a real-time audio visualizer for video walls, and simulated control over event equipment.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
