@@ -5,6 +5,7 @@ import { DeviceScanner } from './components/DeviceScanner';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { VoiceControls } from './components/VoiceControls';
 import { EquipmentController } from './components/EquipmentController';
+import { VOGControlPanel } from './components/VOGControlPanel';
 import { generateSpeech, generateText } from './services/geminiService';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { socket } from './services/socketService';
@@ -20,6 +21,7 @@ export default function App() {
   const [activeScriptId, setActiveScriptId] = useState<number | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [improvingScriptId, setImprovingScriptId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'director' | 'vog'>('director');
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
     voiceName: 'Fenrir',
     speed: 'normal',
@@ -155,6 +157,30 @@ export default function App() {
             EVENT DIRECTOR AI
           </h1>
           <p className="text-gray-400 mt-2 text-lg">The Voice of God</p>
+
+          {/* Tab Navigation */}
+          <div className="flex justify-center gap-4 mt-6">
+            <button
+              onClick={() => setActiveTab('director')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                activeTab === 'director'
+                  ? 'bg-cyan-500 text-gray-900'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              Event Director
+            </button>
+            <button
+              onClick={() => setActiveTab('vog')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                activeTab === 'vog'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}
+            >
+              VOG Control
+            </button>
+          </div>
         </header>
         
         <main>
@@ -178,24 +204,33 @@ export default function App() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <EventFlow 
-                script={script}
-                status={eventFlowStatus}
-                actions={eventFlowActions}
+          {activeTab === 'director' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <EventFlow
+                  script={script}
+                  status={eventFlowStatus}
+                  actions={eventFlowActions}
+                />
+              </div>
+              <div>
+                <VoiceControls settings={voiceSettings} setSettings={setVoiceSettings} />
+                <div className="mt-8">
+                  <DeviceScanner devices={devices} setDevices={setDevices} />
+                </div>
+                <div className="mt-8">
+                  <EquipmentController equipment={equipment} onToggle={handleEquipmentToggle} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-4xl mx-auto">
+              <VOGControlPanel
+                interpreterUrl={import.meta.env.VITE_INTERPRETER_URL}
+                vogServiceUrl={import.meta.env.VITE_VOG_SERVICE_URL}
               />
             </div>
-            <div>
-              <VoiceControls settings={voiceSettings} setSettings={setVoiceSettings} />
-              <div className="mt-8">
-                <DeviceScanner devices={devices} setDevices={setDevices} />
-              </div>
-              <div className="mt-8">
-                <EquipmentController equipment={equipment} onToggle={handleEquipmentToggle} />
-              </div>
-            </div>
-          </div>
+          )}
         </main>
       </div>
     </div>
