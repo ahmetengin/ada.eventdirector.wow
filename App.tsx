@@ -53,26 +53,32 @@ export default function App() {
   const { isPlaying, play, stop, analyser } = useAudioPlayer(handlePlaybackEnd);
 
   const handleSpeak = useCallback(async (item: ScriptItem) => {
-    if (isPlaying) {
+    // If the active item is clicked again, stop it.
+    if (isPlaying && activeScriptId === item.id) {
       stop();
-      if (activeScriptId === item.id) {
-        setActiveScriptId(null);
-        return;
-      }
+      return;
     }
 
+    // Stop any currently playing audio immediately for a more responsive feel
+    // before fetching the new audio. The `play` function also does this, but
+    // doing it here provides instant feedback to the user.
+    if (isPlaying) {
+      stop();
+    }
+    
     setIsLoading(true);
     setError(null);
     setActiveScriptId(item.id);
 
     try {
       const audioContent = await generateSpeech(item.text, voiceSettings);
-      play(audioContent);
+      setIsLoading(false); // API call finished
+      play(audioContent); // Play the new content
     } catch (err) {
       console.error("Error generating speech:", err);
       setError("Failed to generate audio. Please check your API key and network connection.");
+      // Ensure state is cleaned up on error
       setActiveScriptId(null);
-    } finally {
       setIsLoading(false);
     }
   }, [isPlaying, play, stop, activeScriptId, voiceSettings]);
@@ -81,7 +87,7 @@ export default function App() {
     setIsGeneratingScript(true);
     setError(null);
     try {
-      const fullPrompt = `You are an event director. Write a short, clear, and professional announcement for the following request: "${prompt}"`;
+      const fullPrompt = `You are an event director for the Oscars. Write a short, clear, and professional announcement for the following request: "${prompt}"`;
       const newText = await generateText(fullPrompt);
       setScript(prevScript => [
         ...prevScript,
@@ -99,7 +105,7 @@ export default function App() {
     setImprovingScriptId(itemToImprove.id);
     setError(null);
     try {
-      const fullPrompt = `You are a professional event announcer. Rephrase the following announcement to make it clearer and more engaging, while keeping it concise: "${itemToImprove.text}"`;
+      const fullPrompt = `You are a professional event announcer for the Oscars. Rephrase the following announcement to make it more grand and cinematic, while keeping it concise: "${itemToImprove.text}"`;
       const improvedText = await generateText(fullPrompt);
       setScript(prevScript =>
         prevScript.map(item =>
@@ -150,15 +156,15 @@ export default function App() {
     <div className="min-h-screen bg-gray-900 text-gray-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         
-        <header className="text-center mb-8 border-b-2 border-cyan-500 pb-4">
-          <h1 className="font-orbitron text-4xl sm:text-5xl font-bold text-cyan-400 tracking-widest">
-            EVENT DIRECTOR AI
+        <header className="text-center mb-8 border-b-2 border-yellow-500 pb-4">
+          <h1 className="font-orbitron text-4xl sm:text-5xl font-bold text-yellow-400 tracking-widest">
+            OSCARS 2025: COMMAND CENTER
           </h1>
-          <p className="text-gray-400 mt-2 text-lg">The Voice of God</p>
+          <p className="text-gray-400 mt-2 text-lg">Live from the Dolby Theatre</p>
         </header>
         
         <main>
-          <div className="w-full h-48 sm:h-64 md:h-80 bg-black rounded-lg shadow-2xl shadow-cyan-500/20 mb-8 overflow-hidden relative">
+          <div className="w-full h-48 sm:h-64 md:h-80 bg-black rounded-lg shadow-2xl shadow-yellow-500/20 mb-8 overflow-hidden relative">
             <div className="absolute inset-0 flex">
               <div className="w-1/3 border-r-2 border-dashed border-gray-700"></div>
               <div className="w-1/3 border-r-2 border-dashed border-gray-700"></div>
@@ -167,8 +173,8 @@ export default function App() {
             <div className="absolute inset-0 flex items-center justify-center p-2">
               <AudioVisualizer analyser={analyser} isPlaying={isPlaying || isLoading} />
             </div>
-             <div className="absolute top-2 left-4 font-orbitron text-xs text-red-500 opacity-70">HDMI OUT - PGM</div>
-             <div className="absolute bottom-2 right-4 font-orbitron text-xs text-cyan-400 opacity-70">PI-5 CORE</div>
+             <div className="absolute top-2 left-4 font-orbitron text-xs text-red-500 opacity-70">LIVE BROADCAST</div>
+             <div className="absolute bottom-2 right-4 font-orbitron text-xs text-yellow-400 opacity-70">OSCAR CORE</div>
           </div>
           
           {error && (
