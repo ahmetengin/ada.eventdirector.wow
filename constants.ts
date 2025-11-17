@@ -1,5 +1,5 @@
 
-import type { ScriptItem, Device, VoiceName, VoiceSpeed } from './types';
+import type { ScriptItem, Device, VoiceName, VoiceSpeed, Equipment } from './types';
 
 export const INITIAL_SCRIPT: ScriptItem[] = [
   { id: 1, text: "Ladies and gentlemen, welcome to the grand opening. Please take your seats." },
@@ -20,6 +20,14 @@ export const MOCK_DEVICES: Device[] = [
   { id: 'light-02', name: 'House Lights', type: 'Lighting', status: 'Online' },
   { id: 'ai-ada-01', name: 'ADA Interpreter Node', type: 'AI', status: 'Online' },
   { id: 'aud-03', name: 'Backup Mic', type: 'Audio', status: 'Offline' },
+];
+
+export const MOCK_EQUIPMENT: Equipment[] = [
+    { id: 'ctrl-light-01', name: 'Stage Wash Lights', type: 'Lighting', on: true },
+    { id: 'ctrl-light-02', name: 'House Lights', type: 'Lighting', on: false },
+    { id: 'ctrl-aud-01', name: 'Main PA System', type: 'Audio', on: true },
+    { id: 'ctrl-vid-01', name: 'Center Projector', type: 'Video', on: true },
+    { id: 'ctrl-vid-02', name: 'Side Screen Projectors', type: 'Video', on: false },
 ];
 
 export const VOICE_OPTIONS: { value: VoiceName, label: string }[] = [

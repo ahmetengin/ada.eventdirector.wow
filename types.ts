@@ -19,3 +19,10 @@ export interface VoiceSettings {
   speed: VoiceSpeed;
   tone: string;
 }
+
+export interface Equipment {
+  id: string;
+  name: string;
+  type: 'Audio' | 'Lighting' | 'Video';
+  on: boolean;
+}

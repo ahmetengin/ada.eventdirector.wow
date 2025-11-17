@@ -4,14 +4,16 @@ import { EventFlow } from './components/EventFlow';
 import { DeviceScanner } from './components/DeviceScanner';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { VoiceControls } from './components/VoiceControls';
+import { EquipmentController } from './components/EquipmentController';
 import { generateSpeech, generateText } from './services/geminiService';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
-import type { ScriptItem, Device, VoiceSettings } from './types';
-import { INITIAL_SCRIPT } from './constants';
+import type { ScriptItem, Device, VoiceSettings, Equipment } from './types';
+import { INITIAL_SCRIPT, MOCK_EQUIPMENT } from './constants';
 
 export default function App() {
   const [script, setScript] = useState<ScriptItem[]>(INITIAL_SCRIPT);
   const [devices, setDevices] = useState<Device[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>(MOCK_EQUIPMENT);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeScriptId, setActiveScriptId] = useState<number | null>(null);
@@ -157,6 +159,9 @@ export default function App() {
               <VoiceControls settings={voiceSettings} setSettings={setVoiceSettings} />
               <div className="mt-8">
                 <DeviceScanner devices={devices} setDevices={setDevices} />
+              </div>
+              <div className="mt-8">
+                <EquipmentController equipment={equipment} setEquipment={setEquipment} />
               </div>
             </div>
           </div>
