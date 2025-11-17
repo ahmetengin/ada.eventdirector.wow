@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { decode, decodeAudioData } from '../utils';
 
@@ -12,18 +13,51 @@ export const useAudioPlayer = (onPlaybackEnd?: () => void) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  
+  // Use a ref for the callback to prevent stale closures inside other callbacks.
+  const onPlaybackEndRef = useRef(onPlaybackEnd);
+  useEffect(() => {
+    onPlaybackEndRef.current = onPlaybackEnd;
+  }, [onPlaybackEnd]);
+
+  // Centralized cleanup function for robustness and reliability.
+  // This is the core of the fix, ensuring all state is reset from one single place.
+  const cleanup = useCallback(() => {
+    if (sourceNodeRef.current) {
+      // Detach the onended handler to prevent it from firing during manual cleanup.
+      sourceNodeRef.current.onended = null;
+      try {
+        sourceNodeRef.current.stop();
+      } catch (e) {
+        // Can throw error if context is closed or node is already stopped. Safe to ignore.
+      }
+      sourceNodeRef.current.disconnect();
+      sourceNodeRef.current = null;
+    }
+    // Only update state if it needs to be changed to prevent unnecessary re-renders.
+    if (isPlaying) {
+      setIsPlaying(false);
+      if (onPlaybackEndRef.current) {
+        onPlaybackEndRef.current();
+      }
+    }
+  }, [isPlaying]);
 
   // Effect for cleaning up the AudioContext on component unmount
   useEffect(() => {
+    // The returned function from useEffect is the cleanup function.
     return () => {
+      cleanup(); // Use our robust cleanup function.
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(console.error);
       }
     };
-  }, []);
+  }, [cleanup]);
 
   const play = useCallback(async (base64Audio: string) => {
-    // Lazily initialize AudioContext on the first user interaction to comply with browser autoplay policies.
+    // Proactively clean up any existing audio state before playing something new.
+    cleanup();
+
     if (!audioContextRef.current) {
       try {
         const AudioContext = window.AudioContext || (window as unknown as WindowWithAudioContext).webkitAudioContext;
@@ -48,10 +82,6 @@ export const useAudioPlayer = (onPlaybackEnd?: () => void) => {
       await context.resume();
     }
     
-    if (sourceNodeRef.current) {
-      sourceNodeRef.current.stop();
-    }
-    
     try {
         const decodedData = decode(base64Audio);
         const audioBuffer = await decodeAudioData(decodedData, context, 24000, 1);
@@ -61,11 +91,11 @@ export const useAudioPlayer = (onPlaybackEnd?: () => void) => {
         sourceNode.connect(analyser);
         analyser.connect(context.destination);
 
+        // onended now only handles the case where the audio plays to completion naturally.
         sourceNode.onended = () => {
-            setIsPlaying(false);
-            sourceNodeRef.current = null;
-            if (onPlaybackEnd) {
-                onPlaybackEnd();
+            // Check if this is still the active node before cleaning up.
+            if (sourceNodeRef.current === sourceNode) {
+              cleanup();
             }
         };
 
@@ -75,17 +105,14 @@ export const useAudioPlayer = (onPlaybackEnd?: () => void) => {
 
     } catch(e) {
         console.error("Error playing audio: ", e);
-        setIsPlaying(false);
+        cleanup(); // Ensure cleanup happens on error too.
     }
 
-  }, [onPlaybackEnd]);
+  }, [cleanup]);
 
   const stop = useCallback(() => {
-    if (sourceNodeRef.current) {
-      sourceNodeRef.current.stop();
-      // onended will fire and set state
-    }
-  }, []);
+    cleanup();
+  }, [cleanup]);
 
   return { analyser: analyserRef.current, isPlaying, play, stop };
 };
