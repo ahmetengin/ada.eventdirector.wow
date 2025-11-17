@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  vog-service:
+    build:
+      context: ./vog_service
+      dockerfile: Dockerfile
+    container_name: vog-service
+    ports:
+      - "8000:8000"
+    environment:
+      - VOG_JWT_SECRET=${VOG_JWT_SECRET:-change-this-secret-in-production}
+    volumes:
+      - vog-cache:/app/cache
+    restart: unless-stopped
+    networks:
+      - vog-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  interpreter:
+    build:
+      context: ./interpreter_service
+      dockerfile: Dockerfile
+    container_name: interpreter-service
+    ports:
+      - "8001:8001"
+    environment:
+      - VOG_SERVICE_URL=${VOG_SERVICE_URL:-http://vog-service:8000}
+      - WLED_CONTROLLERS=${WLED_CONTROLLERS:-http://192.168.1.101,http://192.168.1.102,http://192.168.1.103}
+      - VISUAL_MODE=${VISUAL_MODE:-bloom}
+      - SAMPLE_RATE=${SAMPLE_RATE:-22050}
+      - FRAME_MS=${FRAME_MS:-30}
+      - PORT=8001
+    devices:
+      - /dev/snd:/dev/snd
+    privileged: true
+    restart: unless-stopped
+    networks:
+      - vog-network
+    depends_on:
+      - vog-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  vog-network:
+    driver: bridge
+
+volumes:
+  vog-cache:
+    driver: local
