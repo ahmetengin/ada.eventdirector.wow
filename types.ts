@@ -26,3 +26,8 @@ export interface Equipment {
   type: 'Audio' | 'Lighting' | 'Video';
   on: boolean;
 }
+
+export interface EquipmentPreset {
+  name: string;
+  settings: Record<string, boolean>; // { [equipmentId]: onState }
+}

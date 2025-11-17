@@ -1,5 +1,5 @@
 
-import type { ScriptItem, Device, VoiceName, VoiceSpeed, Equipment } from './types';
+import type { ScriptItem, Device, VoiceName, VoiceSpeed, Equipment, EquipmentPreset } from './types';
 
 export const INITIAL_SCRIPT: ScriptItem[] = [
   { id: 1, text: "Good evening from Hollywood, and welcome to the 97th Academy Awards. Please silence your mobile devices." },
@@ -30,6 +30,49 @@ export const MOCK_EQUIPMENT: Equipment[] = [
     { id: 'ctrl-aud-01', name: 'Orchestra Play-off Music', type: 'Audio', on: false },
     { id: 'ctrl-vid-01', name: "Winner's Teleprompter", type: 'Video', on: true },
     { id: 'ctrl-stage-01', name: 'Revolving Stage Control', type: 'Video', on: true },
+];
+
+export const INITIAL_PRESETS: EquipmentPreset[] = [
+  {
+    name: 'Award Ceremony Start',
+    settings: {
+      'ctrl-light-01': true,
+      'ctrl-light-02': false,
+      'ctrl-aud-01': true,
+      'ctrl-vid-01': true,
+      'ctrl-stage-01': true,
+    }
+  },
+  {
+    name: 'Panel Discussion',
+    settings: {
+      'ctrl-light-01': false,
+      'ctrl-light-02': false,
+      'ctrl-aud-01': false,
+      'ctrl-vid-01': false,
+      'ctrl-stage-01': false,
+    }
+  },
+    {
+    name: 'Intermission',
+    settings: {
+      'ctrl-light-01': false,
+      'ctrl-light-02': false,
+      'ctrl-aud-01': true,
+      'ctrl-vid-01': false,
+      'ctrl-stage-01': false,
+    }
+  },
+  {
+    name: 'All Systems Off',
+    settings: {
+      'ctrl-light-01': false,
+      'ctrl-light-02': false,
+      'ctrl-aud-01': false,
+      'ctrl-vid-01': false,
+      'ctrl-stage-01': false,
+    }
+  }
 ];
 
 export const VOICE_OPTIONS: { value: VoiceName, label: string }[] = [

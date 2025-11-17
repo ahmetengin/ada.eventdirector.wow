@@ -5,16 +5,18 @@ import { DeviceScanner } from './components/DeviceScanner';
 import { AudioVisualizer } from './components/AudioVisualizer';
 import { VoiceControls } from './components/VoiceControls';
 import { EquipmentController } from './components/EquipmentController';
+import { Clock } from './components/Clock';
 import { generateSpeech, generateText } from './services/geminiService';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { socket } from './services/socketService';
-import type { ScriptItem, Device, VoiceSettings, Equipment } from './types';
-import { INITIAL_SCRIPT, MOCK_EQUIPMENT } from './constants';
+import type { ScriptItem, Device, VoiceSettings, Equipment, EquipmentPreset } from './types';
+import { INITIAL_SCRIPT, MOCK_EQUIPMENT, INITIAL_PRESETS } from './constants';
 
 export default function App() {
   const [script, setScript] = useState<ScriptItem[]>(INITIAL_SCRIPT);
   const [devices, setDevices] = useState<Device[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>(MOCK_EQUIPMENT);
+  const [presets, setPresets] = useState<EquipmentPreset[]>(INITIAL_PRESETS);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeScriptId, setActiveScriptId] = useState<number | null>(null);
@@ -135,6 +137,52 @@ export default function App() {
     socket.emit('equipment-command', { id, state: !currentState });
   }, []);
 
+  const handleLoadPreset = useCallback((presetName: string) => {
+    const preset = presets.find(p => p.name === presetName);
+    if (!preset) {
+      console.warn(`Preset "${presetName}" not found.`);
+      return;
+    }
+    
+    // Update the equipment state based on the selected preset
+    const newEquipmentState = equipment.map(item => ({
+      ...item,
+      // Use the state from the preset if available, otherwise keep the current state
+      on: preset.settings[item.id] ?? item.on,
+    }));
+    setEquipment(newEquipmentState);
+    
+    // Send socket commands for each item in the preset to update the "server" state
+    Object.entries(preset.settings).forEach(([id, state]) => {
+      socket.emit('equipment-command', { id, state });
+    });
+  }, [presets, equipment]);
+
+  const handleSavePreset = useCallback((presetName: string) => {
+    if (!presetName.trim()) {
+      setError("Preset name cannot be empty.");
+      return;
+    }
+    if (presets.some(p => p.name.toLowerCase() === presetName.trim().toLowerCase())) {
+      setError(`A preset named "${presetName}" already exists.`);
+      return;
+    }
+    setError(null); // Clear previous errors
+
+    // Create a settings object from the current state of all equipment
+    const newPresetSettings = equipment.reduce((acc, item) => {
+      acc[item.id] = item.on;
+      return acc;
+    }, {} as Record<string, boolean>);
+
+    const newPreset: EquipmentPreset = {
+      name: presetName.trim(),
+      settings: newPresetSettings,
+    };
+    
+    setPresets(prevPresets => [...prevPresets, newPreset]);
+  }, [equipment, presets]);
+
   // Grouping props for EventFlow for better readability
   const eventFlowStatus = {
     isLoading,
@@ -156,11 +204,16 @@ export default function App() {
     <div className="min-h-screen bg-gray-900 text-gray-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         
-        <header className="text-center mb-8 border-b-2 border-yellow-500 pb-4">
-          <h1 className="font-orbitron text-4xl sm:text-5xl font-bold text-yellow-400 tracking-widest">
-            OSCARS 2025: COMMAND CENTER
-          </h1>
-          <p className="text-gray-400 mt-2 text-lg">Live from the Dolby Theatre</p>
+        <header className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 border-b-2 border-yellow-500 pb-4">
+          <div className="text-center sm:text-left">
+            <h1 className="font-orbitron text-4xl sm:text-5xl font-bold text-yellow-400 tracking-widest">
+              OSCARS 2025: COMMAND CENTER
+            </h1>
+            <p className="text-gray-400 mt-2 text-lg">Live from the Dolby Theatre</p>
+          </div>
+          <div className="flex-shrink-0">
+            <Clock />
+          </div>
         </header>
         
         <main>
@@ -198,7 +251,13 @@ export default function App() {
                 <DeviceScanner devices={devices} setDevices={setDevices} />
               </div>
               <div className="mt-8">
-                <EquipmentController equipment={equipment} onToggle={handleEquipmentToggle} />
+                <EquipmentController 
+                  equipment={equipment} 
+                  onToggle={handleEquipmentToggle}
+                  presets={presets}
+                  onLoadPreset={handleLoadPreset}
+                  onSavePreset={handleSavePreset}
+                />
               </div>
             </div>
           </div>
