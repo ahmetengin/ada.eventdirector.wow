@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { EventFlow } from './components/EventFlow';
 import { DeviceScanner } from './components/DeviceScanner';
 import { AudioVisualizer } from './components/AudioVisualizer';
@@ -7,6 +7,7 @@ import { VoiceControls } from './components/VoiceControls';
 import { EquipmentController } from './components/EquipmentController';
 import { generateSpeech, generateText } from './services/geminiService';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
+import { socket } from './services/socketService';
 import type { ScriptItem, Device, VoiceSettings, Equipment } from './types';
 import { INITIAL_SCRIPT, MOCK_EQUIPMENT } from './constants';
 
@@ -24,6 +25,25 @@ export default function App() {
     speed: 'normal',
     tone: '',
   });
+
+  // Effect to listen for real-time equipment status updates from the socket service
+  useEffect(() => {
+    const handleStatusUpdate = (updatedItem: { id: string, on: boolean }) => {
+      console.log('[App.tsx] Received equipment status update:', updatedItem);
+      setEquipment(prevEquipment =>
+        prevEquipment.map(item =>
+          item.id === updatedItem.id ? { ...item, on: updatedItem.on } : item
+        )
+      );
+    };
+
+    socket.on('equipment-status-update', handleStatusUpdate);
+
+    // Cleanup on component unmount
+    return () => {
+      socket.off('equipment-status-update', handleStatusUpdate);
+    };
+  }, []); // Empty dependency array means this runs once on mount
 
 
   const handlePlaybackEnd = useCallback(() => {
@@ -98,6 +118,17 @@ export default function App() {
     setScript(prevScript => prevScript.filter(item => item.id !== id));
   }, []);
 
+  const handleEquipmentToggle = useCallback((id: string, currentState: boolean) => {
+    // Optimistic UI update for a responsive feel
+    setEquipment(prevEquipment =>
+      prevEquipment.map(item =>
+        item.id === id ? { ...item, on: !currentState } : item
+      )
+    );
+    // Send the command to the "server" via the socket service
+    socket.emit('equipment-command', { id, state: !currentState });
+  }, []);
+
   // Grouping props for EventFlow for better readability
   const eventFlowStatus = {
     isLoading,
@@ -161,7 +192,7 @@ export default function App() {
                 <DeviceScanner devices={devices} setDevices={setDevices} />
               </div>
               <div className="mt-8">
-                <EquipmentController equipment={equipment} setEquipment={setEquipment} />
+                <EquipmentController equipment={equipment} onToggle={handleEquipmentToggle} />
               </div>
             </div>
           </div>

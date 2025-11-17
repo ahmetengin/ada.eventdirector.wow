@@ -4,17 +4,13 @@ import type { Equipment } from '../types';
 
 interface EquipmentControllerProps {
     equipment: Equipment[];
-    setEquipment: React.Dispatch<React.SetStateAction<Equipment[]>>;
+    onToggle: (id: string, currentState: boolean) => void;
 }
 
-export const EquipmentController: React.FC<EquipmentControllerProps> = ({ equipment, setEquipment }) => {
+export const EquipmentController: React.FC<EquipmentControllerProps> = ({ equipment, onToggle }) => {
 
-  const handleToggle = (id: string) => {
-    setEquipment(prevEquipment =>
-      prevEquipment.map(item =>
-        item.id === id ? { ...item, on: !item.on } : item
-      )
-    );
+  const handleToggle = (id: string, currentState: boolean) => {
+    onToggle(id, currentState);
   };
   
   const getTypeIcon = (type: 'Audio' | 'Lighting' | 'Video') => {
@@ -40,7 +36,7 @@ export const EquipmentController: React.FC<EquipmentControllerProps> = ({ equipm
               </div>
             </div>
             <button
-              onClick={() => handleToggle(item.id)}
+              onClick={() => handleToggle(item.id, item.on)}
               className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-cyan-500 ${
                 item.on ? 'bg-green-500' : 'bg-gray-600'
               }`}

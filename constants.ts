@@ -18,7 +18,7 @@ export const MOCK_DEVICES: Device[] = [
   { id: 'vid-03', name: 'Right Video Wall', type: 'Video', status: 'Online' },
   { id: 'light-01', name: 'Stage Light Rig A', type: 'Lighting', status: 'Online' },
   { id: 'light-02', name: 'House Lights', type: 'Lighting', status: 'Online' },
-  { id: 'ai-ada-01', name: 'ADA Interpreter Node', type: 'AI', status: 'Online' },
+  { id: 'ai-ada-01', name: 'ada.interpreter.pi5', type: 'AI', status: 'Online' },
   { id: 'aud-03', name: 'Backup Mic', type: 'Audio', status: 'Offline' },
 ];
 
