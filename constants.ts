@@ -25,11 +25,11 @@ export const MOCK_DEVICES: Device[] = [
 ];
 
 export const MOCK_EQUIPMENT: Equipment[] = [
-    { id: 'ctrl-light-01', name: 'House Lights (Dim for Show)', type: 'Lighting', on: false },
-    { id: 'ctrl-light-02', name: 'Audience Blinders', type: 'Lighting', on: false },
-    { id: 'ctrl-aud-01', name: 'Orchestra Play-off Music', type: 'Audio', on: false },
-    { id: 'ctrl-vid-01', name: "Winner's Teleprompter", type: 'Video', on: true },
-    { id: 'ctrl-stage-01', name: 'Revolving Stage Control', type: 'Video', on: true },
+    { id: 'ctrl-light-01', name: 'House Lights (Dim for Show)', type: 'Lighting', on: false, status: 'Online' },
+    { id: 'ctrl-light-02', name: 'Audience Blinders', type: 'Lighting', on: false, status: 'Online' },
+    { id: 'ctrl-aud-01', name: 'Orchestra Play-off Music', type: 'Audio', on: false, status: 'Online' },
+    { id: 'ctrl-vid-01', name: "Winner's Teleprompter", type: 'Video', on: true, status: 'Online' },
+    { id: 'ctrl-stage-01', name: 'Revolving Stage Control', type: 'Video', on: true, status: 'Online' },
 ];
 
 export const INITIAL_PRESETS: EquipmentPreset[] = [

@@ -25,6 +25,7 @@ export interface Equipment {
   name: string;
   type: 'Audio' | 'Lighting' | 'Video';
   on: boolean;
+  status: 'Online' | 'Offline';
 }
 
 export interface EquipmentPreset {
