@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { VoiceSettings, VoiceName, VoiceSpeed } from '../types';
 import { VOICE_OPTIONS, SPEED_OPTIONS } from '../constants';
@@ -13,6 +12,18 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({ settings, setSetti
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleVoiceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedVoiceName = e.target.value as VoiceName;
+    const selectedVoiceOption = VOICE_OPTIONS.find(option => option.value === selectedVoiceName);
+    if (selectedVoiceOption) {
+        setSettings(prev => ({
+            ...prev,
+            voiceName: selectedVoiceOption.value,
+            pitch: selectedVoiceOption.pitch,
+        }));
+    }
+  };
+
   const labelClass = "block text-sm font-medium text-gray-300 mb-1";
   const controlClass = "w-full bg-gray-700 text-white rounded-lg px-3 py-2 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-colors";
 
@@ -25,7 +36,7 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({ settings, setSetti
           <select
             id="voice-name"
             value={settings.voiceName}
-            onChange={(e) => handleSettingChange('voiceName', e.target.value as VoiceName)}
+            onChange={handleVoiceChange}
             className={controlClass}
           >
             {VOICE_OPTIONS.map(option => (
@@ -46,18 +57,6 @@ export const VoiceControls: React.FC<VoiceControlsProps> = ({ settings, setSetti
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
-        </div>
-
-        <div>
-          <label htmlFor="voice-tone" className={labelClass}>Tone Adjective</label>
-          <input
-            id="voice-tone"
-            type="text"
-            value={settings.tone}
-            onChange={(e) => handleSettingChange('tone', e.target.value)}
-            placeholder="e.g., urgent, celebratory"
-            className={controlClass}
-          />
         </div>
       </div>
     </div>
