@@ -1,6 +1,6 @@
 
-import { GoogleGenAI, Modality, Type, LiveServerMessage, Blob } from "@google/genai";
-import type { VoiceSettings, VoiceSpeed, Equipment, LightingCue, VisualizerColorSchemeDetails, EventStatus, ScriptItem, SearchResult, GroundingSource, SocialPost, SentimentAnalysisResult } from "../types";
+import { GoogleGenAI, Modality, Type, LiveServerMessage, Blob, FunctionDeclaration } from "@google/genai";
+import type { VoiceSettings, VoiceSpeed, Equipment, LightingCue, VisualizerColorSchemeDetails, EventStatus, ScriptItem, SearchResult, GroundingSource, SocialPost, SentimentAnalysisResult, EquipmentPreset } from "../types";
 import { encode } from "../utils";
 
 if (!process.env.API_KEY) {
@@ -9,33 +9,28 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
-/**
- * Converts the voice speed setting to a numeric rate for the API.
- * @param speed The selected voice speed.
- * @returns A numeric speaking rate.
- */
-function convertSpeedToRate(speed: VoiceSpeed): number {
-    switch (speed) {
-        case 'slow': return 0.8;
-        case 'fast': return 1.2;
-        default: return 1.0;
-    }
-}
-
 export async function generateSpeech(text: string, voiceSettings: VoiceSettings): Promise<string> {
   try {
+    // The preview TTS model does not support structured pitch/speakingRate parameters.
+    // We must inject these instructions into the text prompt to avoid INVALID_ARGUMENT errors
+    // while still controlling the voice style.
+    let instructions = "";
+    if (voiceSettings.speed === 'slow') instructions += "Speak slowly. ";
+    if (voiceSettings.speed === 'fast') instructions += "Speak quickly. ";
+    
+    if (voiceSettings.pitch <= -2) instructions += "Use a deep voice. ";
+    else if (voiceSettings.pitch >= 2) instructions += "Use a high-pitched voice. ";
+
+    const fullText = instructions ? `${instructions} ${text}` : text;
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: text }] }], // Use the raw text, no instructions
+      contents: [{ parts: [{ text: fullText }] }],
       config: {
         responseModalities: [Modality.AUDIO],
-        // FIX: Moved pitch and speakingRate into voiceConfig. They are not direct properties of speechConfig.
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: voiceSettings.voiceName },
-            // Use structured parameters for pitch and speed
-            pitch: voiceSettings.pitch,
-            speakingRate: convertSpeedToRate(voiceSettings.speed),
           },
         },
       },
@@ -45,7 +40,7 @@ export async function generateSpeech(text: string, voiceSettings: VoiceSettings)
 
     if (part?.inlineData?.data) {
       // A small amount of data might indicate a silent or failed audio generation
-      if (part.inlineData.data.length < 1000) {
+      if (part.inlineData.data.length < 100) {
         console.warn(`[geminiService] Received very short audio data (length: ${part.inlineData.data.length}), which might be silent.`);
       }
       return part.inlineData.data;
@@ -90,7 +85,11 @@ export async function generateScript(prompt: string): Promise<string[]> {
       },
     });
     
-    const parsed = JSON.parse(response.text);
+    let cleanText = response.text?.trim() || "";
+    // Handle case where AI wraps JSON in markdown code blocks despite responseMimeType
+    cleanText = cleanText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+
+    const parsed = JSON.parse(cleanText);
     if (!parsed.script || !Array.isArray(parsed.script)) {
         throw new Error("Invalid script format received from API");
     }
@@ -334,16 +333,51 @@ export async function getVideosOperationStatus(operation: any) {
 
 interface ConversationCallbacks { onopen: () => void; onmessage: (message: LiveServerMessage) => Promise<void>; onerror: (e: ErrorEvent) => void; onclose: (e: CloseEvent) => void; }
 
-export function startConversation(voiceSettings: VoiceSettings, callbacks: ConversationCallbacks) {
+export function startConversation(voiceSettings: VoiceSettings, callbacks: ConversationCallbacks, toolsData?: { cues: LightingCue[], presets: EquipmentPreset[] }) {
+    
+    const tools: any[] = [];
+
+    if (toolsData) {
+        const cueNames = toolsData.cues.map(c => c.name);
+        const presetNames = toolsData.presets.map(p => p.name);
+
+        const triggerLightingCueFunction: FunctionDeclaration = {
+            name: 'trigger_lighting_cue',
+            description: `Activate a specific lighting cue. Available cues: ${cueNames.join(', ')}`,
+            parameters: {
+                type: Type.OBJECT,
+                properties: {
+                    cue_name: { type: Type.STRING, description: 'The exact name of the lighting cue to trigger.' }
+                },
+                required: ['cue_name']
+            }
+        };
+
+        const loadPresetFunction: FunctionDeclaration = {
+            name: 'load_equipment_preset',
+            description: `Load a full equipment preset configuration. Available presets: ${presetNames.join(', ')}`,
+            parameters: {
+                type: Type.OBJECT,
+                properties: {
+                    preset_name: { type: Type.STRING, description: 'The exact name of the preset to load.' }
+                },
+                required: ['preset_name']
+            }
+        };
+
+        tools.push({ functionDeclarations: [triggerLightingCueFunction, loadPresetFunction] });
+    }
+
     return ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-09-2025',
         callbacks: callbacks,
         config: {
             responseModalities: [Modality.AUDIO],
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceSettings.voiceName } } },
-            systemInstruction: 'You are ADA, the AI Event Director for the Oscars. Be helpful, concise, and professional. Your voice is the command center\'s voice.',
+            systemInstruction: 'You are ADA, the AI Event Director for the Oscars. Be helpful, concise, and professional. You have direct control over the event equipment via tools. If the user asks to trigger a cue or load a preset, use the appropriate tool.',
             inputAudioTranscription: {},
             outputAudioTranscription: {},
+            tools: tools.length > 0 ? tools : undefined,
         },
     });
 }

@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import type { Device } from '../types';
 import { SpinnerIcon } from './icons/SpinnerIcon';
 import { MOCK_DEVICES } from '../constants';
@@ -11,6 +12,20 @@ interface DeviceScannerProps {
 
 export const DeviceScanner: React.FC<DeviceScannerProps> = ({ devices, setDevices }) => {
   const [isScanning, setIsScanning] = useState(false);
+  const [traffic, setTraffic] = useState<Record<string, { active: boolean }>>({});
+
+  // Traffic Simulation
+  useEffect(() => {
+      const interval = setInterval(() => {
+          const newTraffic: Record<string, { active: boolean }> = {};
+          devices.forEach(d => {
+             // Simulate data burst activity
+             newTraffic[d.id] = { active: Math.random() > 0.7 };
+          });
+          setTraffic(newTraffic);
+      }, 200);
+      return () => clearInterval(interval);
+  }, [devices]);
 
   const handleScan = () => {
     setIsScanning(true);
@@ -61,12 +76,26 @@ export const DeviceScanner: React.FC<DeviceScannerProps> = ({ devices, setDevice
               <span className="text-xl mr-3">{getTypeIcon(device.type)}</span>
               <div>
                 <p className="font-semibold text-gray-200">{device.name}</p>
-                <p className="text-xs text-gray-400">{device.type}</p>
+                <p className="text-xs text-gray-400">
+                  {device.ip} • {device.type}
+                </p>
               </div>
             </div>
-            <span className={`font-bold text-sm ${getStatusColor(device.status)}`}>
-              {device.status}
-            </span>
+            <div className="flex flex-col items-end">
+               <div className="flex items-center mb-1">
+                    {/* Data Activity Indicator */}
+                    <span className="text-[9px] text-gray-500 mr-2">DATA</span>
+                    <div className={`w-2 h-2 rounded-full ${traffic[device.id]?.active ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]' : 'bg-gray-600'}`}></div>
+               </div>
+               <span className={`font-bold text-sm block ${getStatusColor(device.status)}`}>
+                {device.status}
+              </span>
+              {device.capabilities && (
+                  <span className="text-[10px] text-purple-300 block">
+                      {device.capabilities.length} Tools Active
+                  </span>
+              )}
+            </div>
           </div>
         ))}
       </div>

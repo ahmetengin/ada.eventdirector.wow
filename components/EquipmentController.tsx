@@ -44,6 +44,32 @@ export const EquipmentController: React.FC<EquipmentControllerProps> = ({
   const [notifications, setNotifications] = useState<{id: string, message: string}[]>([]);
   const prevEquipmentRef = useRef<Equipment[]>(equipment);
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
+  
+  // Traffic Simulation State
+  const [traffic, setTraffic] = useState<Record<string, { tx: boolean, rx: boolean }>>({});
+
+  // Effect to simulate network traffic (TX/RX blinking)
+  useEffect(() => {
+    const interval = setInterval(() => {
+        const newTraffic: Record<string, { tx: boolean, rx: boolean }> = {};
+        equipment.forEach(item => {
+            // Randomly toggle TX/RX to simulate polling/heartbeats
+            // Higher probability of traffic if item is Online
+            if (item.status === 'Online') {
+                newTraffic[item.id] = {
+                    tx: Math.random() > 0.7,
+                    rx: Math.random() > 0.6
+                };
+            } else {
+                newTraffic[item.id] = { tx: false, rx: false };
+            }
+        });
+        setTraffic(newTraffic);
+    }, 150); // Fast updates for "busy" look
+
+    return () => clearInterval(interval);
+  }, [equipment]);
+
 
   useEffect(() => {
     const newlyOffline = equipment.filter(currentItem => {
@@ -174,18 +200,39 @@ export const EquipmentController: React.FC<EquipmentControllerProps> = ({
       </div>
 
       <div className="mt-6 space-y-3">
+        {/* Table Header */}
+        <div className="flex text-xs text-gray-400 uppercase tracking-wider font-bold px-3 mb-1">
+            <div className="w-8">Type</div>
+            <div className="flex-grow">Device</div>
+            <div className="w-16 text-center">MCP Link</div>
+            <div className="w-32 text-right">Controls</div>
+        </div>
+
         {equipment.map(item => (
           <div key={item.id} className={`p-3 rounded-lg flex justify-between items-center transition-all duration-300 ${item.status === 'Offline' ? 'bg-red-900/50 border border-red-700' : 'bg-gray-700/50'}`}>
-            <div className="flex items-center overflow-hidden mr-2">
-              <span className="text-xl mr-3 flex-shrink-0">{getTypeIcon(item.type)}</span>
-              <div className="overflow-hidden">
+            <div className="flex items-center overflow-hidden flex-grow">
+              <span className="text-xl mr-3 flex-shrink-0 w-6">{getTypeIcon(item.type)}</span>
+              <div className="overflow-hidden min-w-0">
                 <p className={`font-semibold truncate transition-colors ${item.status === 'Offline' ? 'text-gray-500 line-through' : 'text-gray-200'}`} title={item.name}>{item.name}</p>
-                <p className={`text-xs transition-colors font-bold ${item.status === 'Offline' ? 'text-red-400' : 'text-gray-400'}`} title={item.brand && item.model ? `${item.brand} ${item.model}` : item.type}>
+                <p className={`text-xs transition-colors font-bold truncate ${item.status === 'Offline' ? 'text-red-400' : 'text-gray-400'}`} title={item.brand && item.model ? `${item.brand} ${item.model}` : item.type}>
                   {item.brand && item.model ? `${item.brand} ${item.model}` : item.type}
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2 flex-shrink-0">
+            
+            {/* Traffic LEDs */}
+            <div className="w-16 flex items-center justify-center space-x-2 mx-2">
+                <div className="flex flex-col items-center">
+                    <div className={`w-2 h-2 rounded-full mb-1 ${traffic[item.id]?.tx ? 'bg-green-400 shadow-[0_0_5px_rgba(74,222,128,0.8)]' : 'bg-green-900'}`}></div>
+                    <span className="text-[8px] text-gray-500">TX</span>
+                </div>
+                <div className="flex flex-col items-center">
+                    <div className={`w-2 h-2 rounded-full mb-1 ${traffic[item.id]?.rx ? 'bg-amber-400 shadow-[0_0_5px_rgba(251,191,36,0.8)]' : 'bg-amber-900'}`}></div>
+                    <span className="text-[8px] text-gray-500">RX</span>
+                </div>
+            </div>
+
+            <div className="flex items-center space-x-2 flex-shrink-0 w-32 justify-end">
                 <button onClick={() => onResearch(item)} className="p-2 rounded-full bg-gray-600 hover:bg-gray-500 transition-colors" title={`Research ${item.name}`}><GoogleIcon className="w-4 h-4 text-white"/></button>
                 {item.status === 'Offline' && (
                     <button onClick={() => onGetTroubleshooting(item)} className="p-2 rounded-full bg-blue-600 hover:bg-blue-500 transition-colors" title="Troubleshoot with AI"><BotIcon className="w-4 h-4 text-white"/></button>

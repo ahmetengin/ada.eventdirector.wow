@@ -1,7 +1,14 @@
+
 export interface ScriptItem {
   id: number;
   text: string;
   linkedCue?: string; // Name of the linked lighting cue
+}
+
+export interface DeviceCapability {
+    name: string;
+    description: string;
+    schema: string; // Simplified representation of tool schema
 }
 
 export interface Device {
@@ -11,6 +18,8 @@ export interface Device {
   model?: string;
   type: 'Audio' | 'Lighting' | 'Video' | 'AI';
   status: 'Online' | 'Offline';
+  ip: string;
+  capabilities?: DeviceCapability[]; // MCP Tools exposed by this device
 }
 
 export type VoiceName = 'Zephyr' | 'Charon' | 'Kore' | 'Puck' | 'Fenrir';
@@ -75,7 +84,6 @@ export interface GeneratedImage {
     url: string; // data URL
 }
 
-// FIX: Add missing EditableImage interface for components/ImageEditor.tsx and components/VideoGenerator.tsx
 export interface EditableImage {
     base64: string;
     mimeType: string;
