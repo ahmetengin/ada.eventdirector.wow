@@ -1,4 +1,3 @@
-
 import type { ScriptItem, Device, VoiceName, VoiceSpeed, Equipment, EquipmentPreset, EventStatus, LightingCue, VisualizerStyle, VisualizerColorScheme, VisualizerColorSchemeDetails } from './types';
 import React from 'react';
 import { LiveIcon } from './components/icons/LiveIcon';
@@ -19,30 +18,35 @@ export const INITIAL_SCRIPT: ScriptItem[] = [
 ];
 
 export const MOCK_DEVICES: Device[] = [
-  { id: 'aud-01', name: 'Dolby Theatre PA Mixer', type: 'Audio', status: 'Online' },
-  { id: 'aud-02', name: 'Orchestra Pit Mics', type: 'Audio', status: 'Online' },
-  { id: 'vid-01', name: 'Main Stage LED Screen', type: 'Video', status: 'Online' },
-  { id: 'vid-02', name: 'Broadcast Truck Uplink 1', type: 'Video', status: 'Online' },
-  { id: 'vid-03', name: 'Red Carpet Cam 3', type: 'Video', status: 'Online' },
-  { id: 'light-01', name: 'Robe Followspot Array', type: 'Lighting', status: 'Online' },
-  { id: 'light-02', name: 'Grand Chandelier Lights', type: 'Lighting', status: 'Online' },
-  { id: 'ai-ada-01', name: 'AI Subtitle & Translation Node', type: 'AI', status: 'Online' },
-  { id: 'aud-03', name: 'Presenter Lavalier Mic 5', type: 'Audio', status: 'Offline' },
+  { id: 'aud-01', name: 'Dolby Theatre PA Mixer', brand: 'Dolby', model: 'IMS3000', type: 'Audio', status: 'Online' },
+  { id: 'aud-02', name: 'Orchestra Pit Mics', brand: 'Neumann', model: 'U87', type: 'Audio', status: 'Online' },
+  { id: 'vid-01', name: 'Main Stage LED Screen', brand: 'ROE Visual', model: 'Ruby R2.3', type: 'Video', status: 'Online' },
+  { id: 'vid-02', name: 'Broadcast Truck Uplink 1', brand: 'NEP', model: 'EN1', type: 'Video', status: 'Online' },
+  { id: 'light-01', name: 'Robe Followspot Array', brand: 'Robe', model: 'RoboSpot', type: 'Lighting', status: 'Online' },
+  { id: 'ai-m4-core-01', name: 'Mac Mini M4 (AI Core)', brand: 'Apple', model: 'Mac Mini M4', type: 'AI', status: 'Online' },
+  { id: 'ai-m3-client-01', name: 'MacBook Air M3 (Director Client)', brand: 'Apple', model: 'MacBook Air M3', type: 'AI', status: 'Online' },
+  { id: 'aud-03', name: 'Presenter Lavalier Mic 5', brand: 'Shure', model: 'Axient Digital', type: 'Audio', status: 'Offline' },
 ];
 
 export const MOCK_EQUIPMENT: Equipment[] = [
-    { id: 'ctrl-light-01', name: 'House Lights (Dim for Show)', type: 'Lighting', on: false, status: 'Online' },
-    { id: 'ctrl-light-02', name: 'Audience Blinders', type: 'Lighting', on: false, status: 'Online' },
-    { id: 'ctrl-aud-01', name: 'Orchestra Play-off Music', type: 'Audio', on: false, status: 'Online' },
-    { id: 'ctrl-vid-01', name: "Winner's Teleprompter", type: 'Video', on: true, status: 'Online' },
-    { id: 'ctrl-stage-01', name: 'Revolving Stage Control', type: 'Video', on: true, status: 'Online' },
+    { id: 'ctrl-light-01', name: 'ETC Source Four Pars (House)', brand: 'ETC', model: 'Source Four', type: 'Lighting', on: true, status: 'Online' },
+    { id: 'ctrl-light-02', name: 'Robe BMFL Spots (Movers)', brand: 'Robe', model: 'BMFL Spot', type: 'Lighting', on: false, status: 'Online' },
+    { id: 'ctrl-aud-01', name: 'Yamaha CL5 Digital Mixer (Playback)', brand: 'Yamaha', model: 'CL5', type: 'Audio', on: true, status: 'Online' },
+    { id: 'ctrl-vid-01', name: "Teleprompter Feed (Main)", brand: 'Autoscript', model: 'EPIC-IP19', type: 'Video', on: true, status: 'Online' },
+    { id: 'ctrl-stage-01', name: 'Revolving Stage Control', brand: 'Gala Systems', model: 'Spiralift', type: 'Video', on: false, status: 'Online' },
+    { id: 'ctrl-ai-01', name: 'AI Processing Core (M4)', brand: 'Apple', model: 'Mac Mini', type: 'AI', on: true, status: 'Online' },
+    { id: 'ctrl-ai-02', name: 'AI Theme Engine (Gemini)', brand: 'Google', model: 'Gemini Pro', type: 'AI', on: true, status: 'Online' },
+    { id: 'ctrl-vid-02', name: 'Resolume Arena Media Server', brand: 'Resolume', model: 'Arena 7', type: 'Video', on: true, status: 'Online' },
+    { id: 'ctrl-vid-03', name: 'Video Wall Panels (Main)', brand: 'ROE Visual', model: 'Ruby R2.3', type: 'Video', on: true, status: 'Online' },
+    { id: 'ctrl-vid-04', name: 'Side Wing Screens (Left)', brand: 'ROE Visual', model: 'CB5', type: 'Video', on: true, status: 'Online' },
+    { id: 'ctrl-vid-05', name: 'Side Wing Screens (Right)', brand: 'ROE Visual', model: 'CB5', type: 'Video', on: true, status: 'Online' },
 ];
 
 export const INITIAL_PRESETS: EquipmentPreset[] = [
-  { name: 'Award Ceremony Start', settings: { 'ctrl-light-01': true, 'ctrl-light-02': false, 'ctrl-aud-01': true, 'ctrl-vid-01': true, 'ctrl-stage-01': true } },
-  { name: 'Panel Discussion', settings: { 'ctrl-light-01': false, 'ctrl-light-02': false, 'ctrl-aud-01': false, 'ctrl-vid-01': false, 'ctrl-stage-01': false } },
-  { name: 'Intermission', settings: { 'ctrl-light-01': false, 'ctrl-light-02': false, 'ctrl-aud-01': true, 'ctrl-vid-01': false, 'ctrl-stage-01': false } },
-  { name: 'All Systems Off', settings: { 'ctrl-light-01': false, 'ctrl-light-02': false, 'ctrl-aud-01': false, 'ctrl-vid-01': false, 'ctrl-stage-01': false } }
+  { name: 'Award Ceremony Start', settings: { 'ctrl-light-01': true, 'ctrl-light-02': true, 'ctrl-aud-01': true, 'ctrl-vid-01': true, 'ctrl-stage-01': false, 'ctrl-ai-01': true, 'ctrl-ai-02': true, 'ctrl-vid-02': true, 'ctrl-vid-03': true, 'ctrl-vid-04': true, 'ctrl-vid-05': true } },
+  { name: 'Panel Discussion', settings: { 'ctrl-light-01': true, 'ctrl-light-02': false, 'ctrl-aud-01': true, 'ctrl-vid-01': true, 'ctrl-stage-01': false, 'ctrl-ai-01': true, 'ctrl-ai-02': true, 'ctrl-vid-02': true, 'ctrl-vid-03': true, 'ctrl-vid-04': false, 'ctrl-vid-05': false } },
+  { name: 'Intermission', settings: { 'ctrl-light-01': true, 'ctrl-light-02': false, 'ctrl-aud-01': true, 'ctrl-vid-01': false, 'ctrl-stage-01': false, 'ctrl-ai-01': true, 'ctrl-ai-02': true, 'ctrl-vid-02': true, 'ctrl-vid-03': true, 'ctrl-vid-04': true, 'ctrl-vid-05': true } },
+  { name: 'All Systems Off', settings: { 'ctrl-light-01': false, 'ctrl-light-02': false, 'ctrl-aud-01': false, 'ctrl-vid-01': false, 'ctrl-stage-01': false, 'ctrl-ai-01': false, 'ctrl-ai-02': false, 'ctrl-vid-02': false, 'ctrl-vid-03': false, 'ctrl-vid-04': false, 'ctrl-vid-05': false } }
 ];
 
 export const VOICE_OPTIONS: { value: VoiceName, label: string, pitch: number }[] = [
@@ -70,7 +74,8 @@ export const STATUS_CONFIG: Record<EventStatus, { label: string; icon: React.FC<
 export const INITIAL_LIGHTING_CUES: LightingCue[] = [
     { name: 'House Lights Dim', settings: { 'ctrl-light-01': true, 'ctrl-light-02': false } },
     { name: 'Stage Blackout', settings: { 'ctrl-light-01': false, 'ctrl-light-02': false } },
-    { name: 'Audience Blinders On', settings: { 'ctrl-light-01': true, 'ctrl-light-02': true } }
+    { name: 'Winner Spotlight', settings: { 'ctrl-light-01': false, 'ctrl-light-02': true } },
+    { name: 'Audience Blinders', settings: { 'ctrl-light-01': true, 'ctrl-light-02': true } }
 ];
 
 export const INITIAL_VISUALIZER_COLOR_SCHEMES: Record<string, VisualizerColorSchemeDetails> = {

@@ -1,7 +1,11 @@
 
 
+
+
+
 import { GoogleGenAI, Modality, Type, LiveServerMessage, Blob } from "@google/genai";
-import type { VoiceSettings, VoiceSpeed, Equipment, LightingCue, VisualizerColorSchemeDetails, EventStatus, ScriptItem } from "../types";
+// FIX: Add SearchResult and GroundingSource to imports for the new research function.
+import type { VoiceSettings, VoiceSpeed, Equipment, LightingCue, VisualizerColorSchemeDetails, EventStatus, ScriptItem, SearchResult, GroundingSource } from "../types";
 import { encode } from "../utils";
 
 if (!process.env.API_KEY) {
@@ -64,7 +68,8 @@ export async function generateSpeech(text: string, voiceSettings: VoiceSettings)
 export async function generateTextStream(prompt: string, onChunk: (text: string) => void): Promise<void> {
   try {
     const response = await ai.models.generateContentStream({
-      model: "gemini-2.5-flash-lite",
+      // FIX: Use 'gemini-flash-lite-latest' as per the model naming guidelines.
+      model: "gemini-flash-lite-latest",
       contents: prompt,
     });
     for await (const chunk of response) {
@@ -115,6 +120,34 @@ export async function getTroubleshootingSteps(equipment: Equipment): Promise<str
     } catch (error) {
         console.error("Error in getTroubleshootingSteps:", error);
         throw new Error("Failed to get troubleshooting steps from Gemini API.");
+    }
+}
+
+// FIX: Add researchWithGoogleSearch function to implement research functionality.
+export async function researchWithGoogleSearch(prompt: string): Promise<SearchResult> {
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+            },
+        });
+
+        const text = response.text ?? "";
+
+        const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+        const sources: GroundingSource[] = groundingChunks
+            ?.filter((chunk: any) => chunk.web)
+            ?.map((chunk: any) => ({
+                uri: chunk.web.uri,
+                title: chunk.web.title,
+            })) || [];
+
+        return { text, sources };
+    } catch (error) {
+        console.error("Error in researchWithGoogleSearch:", error);
+        throw new Error("Failed to get research results from Gemini API.");
     }
 }
 
@@ -208,6 +241,73 @@ export async function suggestNextStatus(currentStatus: EventStatus, script: Scri
     }
 }
 
+// --- Image & Video Generation ---
+export async function generateImageFromPrompt(prompt: string, aspectRatio: '16:9' | '9:16' = '16:9'): Promise<string> {
+    try {
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: prompt,
+            config: {
+                numberOfImages: 1,
+                outputMimeType: 'image/jpeg',
+                aspectRatio: aspectRatio,
+            },
+        });
+
+        const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+        return `data:image/jpeg;base64,${base64ImageBytes}`;
+    } catch (error) {
+        console.error("Error in generateImageFromPrompt:", error);
+        throw new Error("Failed to generate image from prompt using Gemini API.");
+    }
+}
+
+
+function getVeoAiInstance() {
+    return new GoogleGenAI({ apiKey: process.env.API_KEY! });
+}
+
+export async function generateVideoFromImage(base64Image: string, mimeType: string, prompt: string, aspectRatio: '16:9' | '9:16') {
+    const veoAi = getVeoAiInstance();
+    try {
+        let operation = await veoAi.models.generateVideos({
+            model: 'veo-3.1-fast-generate-preview',
+            prompt: prompt,
+            image: {
+                imageBytes: base64Image,
+                mimeType: mimeType,
+            },
+            config: {
+                numberOfVideos: 1,
+                aspectRatio: aspectRatio,
+                resolution: '720p',
+            }
+        });
+        return operation;
+    } catch (error) {
+        console.error("Error starting video generation:", error);
+        if (error instanceof Error && error.message.includes("Requested entity was not found.")) {
+             throw new Error("API key not valid. Please select a valid API key.");
+        }
+        throw new Error("Failed to start video generation.");
+    }
+}
+
+export async function getVideosOperationStatus(operation: any) {
+    const veoAi = getVeoAiInstance();
+    try {
+        const updatedOperation = await veoAi.operations.getVideosOperation({ operation: operation });
+        return updatedOperation;
+    } catch (error) {
+        console.error("Error polling video status:", error);
+         if (error instanceof Error && error.message.includes("Requested entity was not found.")) {
+             throw new Error("API key not valid. Please select a valid API key.");
+        }
+        throw new Error("Failed to get video generation status.");
+    }
+}
+
+
 // --- Live Conversation Service ---
 
 // FIX: The callback keys for ai.live.connect must be all lowercase (e.g., onopen, onmessage).
@@ -231,8 +331,7 @@ export function createPcmBlob(data: Float32Array): Blob {
   const l = data.length;
   const int16 = new Int16Array(l);
   for (let i = 0; i < l; i++) {
-    const s = Math.max(-1, Math.min(1, data[i]));
-    int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    int16[i] = data[i] * 32768;
   }
   return { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
 }

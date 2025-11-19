@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { EventFlow } from './components/EventFlow';
 import { DeviceScanner } from './components/DeviceScanner';
@@ -12,17 +10,16 @@ import { EventStatus } from './components/EventStatus';
 import { EventFeed } from './components/EventFeed';
 import { VisualizerControls } from './components/VisualizerControls';
 import { AIModal } from './components/AIModal';
-import { generateSpeech, generateTextStream, generateScript, startConversation, createPcmBlob, getTroubleshootingSteps, generateLightingCue, generateVisualizerTheme, suggestNextStatus } from './services/geminiService';
+import { ThemeCreator } from './components/ThemeCreator';
+import { RemoteCommand } from './components/RemoteCommand';
+import { generateSpeech, generateTextStream, generateScript, startConversation, createPcmBlob, getTroubleshootingSteps, generateLightingCue, generateVisualizerTheme, suggestNextStatus, generateImageFromPrompt, generateVideoFromImage, getVideosOperationStatus, researchWithGoogleSearch } from './services/geminiService';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { socket } from './services/socketService';
-import type { ScriptItem, Device, VoiceSettings, Equipment, EquipmentPreset, TranscriptEntry, EventStatus as EventStatusType, VisualizerSettings, LightingCue, VisualizerColorSchemeDetails } from './types';
+import type { ScriptItem, Device, VoiceSettings, Equipment, EquipmentPreset, TranscriptEntry, EventStatus as EventStatusType, VisualizerSettings, LightingCue, VisualizerColorSchemeDetails, GeneratedImage, VideoGenerationStatus, BackdropContent, LastGeneratedAssets, BackdropTarget, SearchResult } from './types';
 import { INITIAL_SCRIPT, MOCK_EQUIPMENT, INITIAL_PRESETS, INITIAL_LIGHTING_CUES, INITIAL_VISUALIZER_COLOR_SCHEMES } from './constants';
-// FIX: The 'LiveConnection' type is not exported from '@google/genai'.
 import type { LiveServerMessage } from '@google/genai';
 import { decode, decodeAudioData } from './utils';
 
-// FIX: The 'LiveConnection' type is not exported from '@google/genai'.
-// The session type will be inferred from the `startConversation` function's return type.
 type LiveConnection = Awaited<ReturnType<typeof startConversation>>;
 
 export default function App() {
@@ -39,7 +36,7 @@ export default function App() {
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>({
     voiceName: 'Zephyr',
     speed: 'normal',
-    pitch: -4.0, // Default pitch for Zephyr voice
+    pitch: -4.0,
   });
   const [eventStatus, setEventStatus] = useState<EventStatusType>('Starting Soon');
   const [visualizerSettings, setVisualizerSettings] = useState<VisualizerSettings>({
@@ -47,15 +44,23 @@ export default function App() {
     colorScheme: 'gold',
   });
   
-  // --- AI-Powered State ---
   const [lightingCues, setLightingCues] = useState<LightingCue[]>(INITIAL_LIGHTING_CUES);
   const [visualizerColorSchemes, setVisualizerColorSchemes] = useState<Record<string, VisualizerColorSchemeDetails>>(INITIAL_VISUALIZER_COLOR_SCHEMES);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [aiModalContent, setAiModalContent] = useState('');
+  const [aiModalContent, setAiModalContent] = useState<string | SearchResult>('');
   const [aiModalTitle, setAiModalTitle] = useState('');
   const [isAiModalLoading, setIsAiModalLoading] = useState(false);
   const [suggestedStatus, setSuggestedStatus] = useState<string | null>(null);
 
+  // --- Theme Creator & Backdrop State ---
+  const [lastGeneratedAssets, setLastGeneratedAssets] = useState<LastGeneratedAssets>({});
+  const [backdropMain, setBackdropMain] = useState<BackdropContent | null>(null);
+  const [backdropLeft, setBackdropLeft] = useState<BackdropContent | null>(null);
+  const [backdropRight, setBackdropRight] = useState<BackdropContent | null>(null);
+  const [isApiKeySelected, setIsApiKeySelected] = useState(false);
+  const [videoGenerationStatus, setVideoGenerationStatus] = useState<VideoGenerationStatus>('idle');
+  const [videoGenerationError, setVideoGenerationError] = useState<string | null>(null);
+  const operationRef = useRef<any>(null);
 
   // --- Live Conversation State ---
   const [isConversationActive, setIsConversationActive] = useState(false);
@@ -63,7 +68,6 @@ export default function App() {
   const [userTranscript, setUserTranscript] = useState('');
   const [modelTranscript, setModelTranscript] = useState('');
   const [transcriptHistory, setTranscriptHistory] = useState<TranscriptEntry[]>([]);
-  // FIX: Using the inferred 'LiveConnection' type.
   const liveSessionRef = useRef<LiveConnection | null>(null);
   const audioResourcesRef = useRef<{
     stream: MediaStream | null,
@@ -79,6 +83,49 @@ export default function App() {
   }>({ nextStartTime: 0, sources: new Set() });
 
   useEffect(() => {
+    if (window.aistudio) {
+        window.aistudio.hasSelectedApiKey().then((hasKey: boolean) => {
+            setIsApiKeySelected(hasKey);
+        });
+    }
+  }, []);
+
+  useEffect(() => {
+    let pollTimeout: NodeJS.Timeout;
+    const poll = async () => {
+        if (videoGenerationStatus === 'polling' && operationRef.current) {
+            try {
+                const updatedOperation = await getVideosOperationStatus(operationRef.current);
+                operationRef.current = updatedOperation;
+                if (updatedOperation.done) {
+                    const downloadLink = updatedOperation.response?.generatedVideos?.[0]?.video?.uri;
+                    if (downloadLink) {
+                        const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+                        const videoBlob = await response.blob();
+                        const videoUrl = URL.createObjectURL(videoBlob);
+                        setLastGeneratedAssets(prev => ({ ...prev, videoUrl }));
+                        setVideoGenerationStatus('success');
+                    } else {
+                        throw new Error("Video generation finished but no download link was found.");
+                    }
+                } else {
+                    pollTimeout = setTimeout(poll, 10000);
+                }
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+                if (errorMessage.includes("API key not valid")) {
+                    setIsApiKeySelected(false);
+                }
+                setVideoGenerationError(errorMessage);
+                setVideoGenerationStatus('error');
+            }
+        }
+    };
+    if (videoGenerationStatus === 'polling') { poll(); }
+    return () => clearTimeout(pollTimeout);
+  }, [videoGenerationStatus]);
+
+  useEffect(() => {
     const handleStatusUpdate = (updatedItem: { id: string, on: boolean }) => {
       setEquipment(prevEquipment =>
         prevEquipment.map(item =>
@@ -86,14 +133,11 @@ export default function App() {
         )
       );
     };
-
     socket.on('equipment-status-update', handleStatusUpdate);
-
     return () => {
       socket.off('equipment-status-update', handleStatusUpdate);
     };
   }, []);
-
 
   const handlePlaybackEnd = useCallback(() => {
       setActiveScriptId(null);
@@ -107,9 +151,7 @@ export default function App() {
         console.warn(`Lighting cue "${cueName}" not found.`);
         return;
     }
-
     const cueSettings = cue.settings;
-
     setEquipment(prevEquipment =>
         prevEquipment.map(item => {
             if (item.id in cueSettings) {
@@ -118,7 +160,6 @@ export default function App() {
             return item;
         })
     );
-
     Object.entries(cueSettings).forEach(([id, state]) => {
         socket.emit('equipment-command', { id, state });
     });
@@ -129,14 +170,8 @@ export default function App() {
       stop();
       return;
     }
-
-    if (isPlaying) {
-      stop();
-    }
-
-    if (item.linkedCue) {
-        triggerLightingCue(item.linkedCue);
-    }
+    if (isPlaying) { stop(); }
+    if (item.linkedCue) { triggerLightingCue(item.linkedCue); }
     
     setIsLoading(true);
     setError(null);
@@ -157,16 +192,10 @@ export default function App() {
   const handleGenerateScript = useCallback(async (prompt: string) => {
     setIsGeneratingScript(true);
     setError(null);
-
     const newItemId = Date.now();
-    setScript(prevScript => [
-      ...prevScript,
-      { id: newItemId, text: '' }
-    ]);
-
+    setScript(prevScript => [...prevScript, { id: newItemId, text: '' }]);
     try {
       const fullPrompt = `You are an event director for the Oscars. Write a short, clear, and professional announcement for the following request: "${prompt}"`;
-      
       await generateTextStream(fullPrompt, (chunkText) => {
         setScript(prevScript =>
           prevScript.map(item =>
@@ -174,7 +203,6 @@ export default function App() {
           )
         );
       });
-
     } catch (err) {
       console.error("Error generating script:", err);
       setError("Failed to generate new script item. Please try again.");
@@ -188,16 +216,13 @@ export default function App() {
     setImprovingScriptId(itemToImprove.id);
     setError(null);
     const originalText = itemToImprove.text;
-    
     setScript(prevScript =>
       prevScript.map(item =>
         item.id === itemToImprove.id ? { ...item, text: '' } : item
       )
     );
-
     try {
       const fullPrompt = `You are a professional event announcer for the Oscars. Rephrase the following announcement to make it more grand and cinematic, while keeping it concise: "${originalText}"`;
-      
       await generateTextStream(fullPrompt, (chunkText) => {
         setScript(prevScript =>
           prevScript.map(item =>
@@ -205,7 +230,6 @@ export default function App() {
           )
         );
       });
-
     } catch (err) {
       console.error("Error improving script:", err);
       setError("Failed to improve script item. Please try again.");
@@ -232,28 +256,27 @@ export default function App() {
   }, []);
 
   const handleRegenerateFullScript = useCallback(async () => {
-    if (!window.confirm("Are you sure you want to regenerate the entire script? This will replace the current one.")) {
-        return;
-    }
+    if (!window.confirm("Are you sure you want to regenerate the entire script? This will replace the current one.")) return;
     setIsRegeneratingScript(true);
     setError(null);
     try {
         const fullPrompt = `You are an event director for the Oscars. Write a full 8-item event script of short, clear, and professional announcements. The theme is the Oscars award ceremony.`;
         const newScriptText = await generateScript(fullPrompt);
-
         const newScript: ScriptItem[] = newScriptText.map((text, index) => ({
-            id: Date.now() + index,
-            text: text.trim(),
+            id: Date.now() + index, text: text.trim(),
         }));
-        
         setScript(newScript);
-
     } catch (err) {
         console.error("Error regenerating script:", err);
         setError("Failed to regenerate the script. The AI might be busy. Please try again.");
     } finally {
         setIsRegeneratingScript(false);
     }
+  }, []);
+  
+  const handleInjectScriptItem = useCallback((text: string) => {
+    const newItem: ScriptItem = { id: Date.now(), text };
+    setScript(prevScript => [newItem, ...prevScript]);
   }, []);
 
   const handleEquipmentToggle = useCallback((id: string, currentState: boolean) => {
@@ -268,39 +291,25 @@ export default function App() {
   const handleLoadPreset = useCallback((presetName: string) => {
     const preset = presets.find(p => p.name === presetName);
     if (!preset) return;
-    
     const newEquipmentState = equipment.map(item => ({
-      ...item,
-      on: preset.settings[item.id] ?? item.on,
+      ...item, on: preset.settings[item.id] ?? item.on,
     }));
     setEquipment(newEquipmentState);
-    
     Object.entries(preset.settings).forEach(([id, state]) => {
       socket.emit('equipment-command', { id, state });
     });
   }, [presets, equipment]);
 
   const handleSavePreset = useCallback((presetName: string) => {
-    if (!presetName.trim()) {
-      setError("Preset name cannot be empty.");
-      return;
-    }
+    if (!presetName.trim()) { setError("Preset name cannot be empty."); return; }
     if (presets.some(p => p.name.toLowerCase() === presetName.trim().toLowerCase())) {
-      setError(`A preset named "${presetName}" already exists.`);
-      return;
+      setError(`A preset named "${presetName}" already exists.`); return;
     }
     setError(null);
-
     const newPresetSettings = equipment.reduce((acc, item) => {
-      acc[item.id] = item.on;
-      return acc;
+      acc[item.id] = item.on; return acc;
     }, {} as Record<string, boolean>);
-
-    const newPreset: EquipmentPreset = {
-      name: presetName.trim(),
-      settings: newPresetSettings,
-    };
-    
+    const newPreset: EquipmentPreset = { name: presetName.trim(), settings: newPresetSettings };
     setPresets(prevPresets => [...prevPresets, newPreset]);
   }, [equipment, presets]);
 
@@ -310,10 +319,8 @@ export default function App() {
 
   const handleUpdatePreset = useCallback((presetName: string) => {
     const currentSettings = equipment.reduce((acc, item) => {
-      acc[item.id] = item.on;
-      return acc;
+      acc[item.id] = item.on; return acc;
     }, {} as Record<string, boolean>);
-
     setPresets(prevPresets =>
       prevPresets.map(p =>
         p.name === presetName ? { ...p, settings: currentSettings } : p
@@ -328,18 +335,11 @@ export default function App() {
   const handleSimulateOffline = useCallback(() => {
     setEquipment(prevEquipment => {
         const onlineEquipment = prevEquipment.filter(e => e.status === 'Online');
-        
-        if (onlineEquipment.length === 0) {
-            return prevEquipment.map(e => ({ ...e, status: 'Online' }));
-        }
-
+        if (onlineEquipment.length === 0) { return prevEquipment.map(e => ({ ...e, status: 'Online' })); }
         const randomIndex = Math.floor(Math.random() * onlineEquipment.length);
         const itemToSetOffline = onlineEquipment[randomIndex];
-        
         return prevEquipment.map(item => 
-            item.id === itemToSetOffline.id 
-                ? { ...item, status: 'Offline', on: false }
-                : item
+            item.id === itemToSetOffline.id ? { ...item, status: 'Offline', on: false } : item
         );
     });
   }, []);
@@ -359,42 +359,88 @@ export default function App() {
         setIsAiModalLoading(false);
     }
   }, []);
-
-  const handleGenerateLightingCue = useCallback(async (prompt: string) => {
-      // FIX: Corrected typo from setIsAiModalTitle to setAiModalTitle.
-      setAiModalTitle('Generating Lighting Cue...');
-      setAiModalContent('');
-      setIsAiModalLoading(true);
-      setError(null);
-      try {
-          const newCue = await generateLightingCue(prompt, equipment);
-          setLightingCues(prev => [...prev, { ...newCue, isAiGenerated: true }]);
-      } catch (err) {
-          setError(`Failed to generate lighting cue. ${err instanceof Error ? err.message : ''}`);
-      } finally {
-          setIsAiModalLoading(false);
-      }
-  }, [equipment]);
   
-  const handleGenerateVisualizerTheme = useCallback(async (prompt: string) => {
-      // FIX: Corrected typo from setIsAiModalTitle to setAiModalTitle.
-      setAiModalTitle('Generating Visualizer Theme...');
-      setAiModalContent('');
-      setIsAiModalLoading(true);
-      setError(null);
-      try {
-          const { name, colors } = await generateVisualizerTheme(prompt);
-          const newSchemeKey = name.toLowerCase().replace(/\s+/g, '-');
-          const newScheme = { ...colors, name, isAiGenerated: true };
-          setVisualizerColorSchemes(prev => ({ ...prev, [newSchemeKey]: newScheme }));
-          setVisualizerSettings(prev => ({ ...prev, colorScheme: newSchemeKey }));
-      } catch (err) {
-          setError(`Failed to generate visualizer theme. ${err instanceof Error ? err.message : ''}`);
-      } finally {
-          setIsAiModalLoading(false);
-      }
+  const handleResearchEquipment = useCallback(async (item: Equipment) => {
+    setAiModalTitle(`Research: ${item.name}`);
+    setAiModalContent('');
+    setIsAiModalLoading(true);
+    setIsAiModalOpen(true);
+    setError(null);
+    try {
+        const result = await researchWithGoogleSearch(`What are the key features and common issues for the ${item.name}?`);
+        setAiModalContent(result);
+    } catch (err) {
+        setAiModalContent({text: "Sorry, I couldn't get research results at this time. Please check the console for errors.", sources: []});
+    } finally {
+        setIsAiModalLoading(false);
+    }
   }, []);
 
+  const handleSetBackdrop = useCallback((content: BackdropContent, target: BackdropTarget) => {
+    if (target === 'main' || target === 'all') setBackdropMain(content);
+    if (target === 'left' || target === 'all') setBackdropLeft(content);
+    if (target === 'right' || target === 'all') setBackdropRight(content);
+  }, []);
+
+  const handleGenerateThemeAssets = useCallback(async (prompt: string, assetsToGenerate: string[], aspectRatio: '16:9' | '9:16') => {
+    setError(null);
+    setLastGeneratedAssets({});
+    let generatedImageData: GeneratedImage | null = null;
+
+    if (assetsToGenerate.includes('image') || assetsToGenerate.includes('video')) {
+      try {
+        const imageUrl = await generateImageFromPrompt(prompt, aspectRatio);
+        generatedImageData = { id: Date.now().toString(), prompt, url: imageUrl };
+        setLastGeneratedAssets(prev => ({ ...prev, image: generatedImageData! }));
+      } catch (err) {
+        setError(`Failed to generate image. ${err instanceof Error ? err.message : ''}`);
+        return;
+      }
+    }
+
+    if (assetsToGenerate.includes('video') && generatedImageData) {
+      setVideoGenerationStatus('generating');
+      setVideoGenerationError(null);
+      try {
+        const [mimeString, base64] = generatedImageData.url.split(',');
+        const mimeType = mimeString.match(/:(.*?);/)?.[1];
+        if (!base64 || !mimeType) throw new Error("Could not parse generated image data.");
+        const operation = await generateVideoFromImage(base64, mimeType, prompt, aspectRatio);
+        operationRef.current = operation;
+        setVideoGenerationStatus('polling');
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred.";
+        if (errorMessage.includes("API key not valid")) { setIsApiKeySelected(false); }
+        setVideoGenerationError(errorMessage);
+        setVideoGenerationStatus('error');
+      }
+    }
+    
+    if (assetsToGenerate.includes('lightingCue')) {
+      try {
+        const newCue = await generateLightingCue(prompt, equipment);
+        const finalCue = { ...newCue, isAiGenerated: true };
+        setLightingCues(prev => [...prev, finalCue]);
+        setLastGeneratedAssets(prev => ({ ...prev, cue: finalCue }));
+      } catch (err) {
+        setError(`Failed to generate lighting cue. ${err instanceof Error ? err.message : ''}`);
+      }
+    }
+
+    if (assetsToGenerate.includes('visualizerTheme')) {
+      try {
+        const { name, colors } = await generateVisualizerTheme(prompt);
+        const newSchemeKey = name.toLowerCase().replace(/\s+/g, '-');
+        const newScheme = { ...colors, name, isAiGenerated: true };
+        setVisualizerColorSchemes(prev => ({ ...prev, [newSchemeKey]: newScheme }));
+        setVisualizerSettings(prev => ({ ...prev, colorScheme: newSchemeKey }));
+        setLastGeneratedAssets(prev => ({ ...prev, theme: { key: newSchemeKey, details: newScheme } }));
+      } catch (err) {
+        setError(`Failed to generate visualizer theme. ${err instanceof Error ? err.message : ''}`);
+      }
+    }
+  }, [equipment]);
+  
   const handleSuggestStatus = useCallback(async () => {
     setIsAiModalLoading(true);
     setSuggestedStatus(null);
@@ -409,13 +455,15 @@ export default function App() {
     }
   }, [eventStatus, script, activeScriptId]);
 
+  const handleSelectApiKey = useCallback(async () => {
+      if (window.aistudio) {
+          await window.aistudio.openSelectKey();
+          setIsApiKeySelected(true);
+      }
+  }, []);
 
-  // --- Live Conversation Handlers ---
   const handleStopConversation = useCallback(() => {
-    if (liveSessionRef.current) {
-        liveSessionRef.current.close();
-        liveSessionRef.current = null;
-    }
+    if (liveSessionRef.current) { liveSessionRef.current.close(); liveSessionRef.current = null; }
     const { stream, scriptProcessor, source, inputAudioContext, outputAudioContext } = audioResourcesRef.current;
     if (stream) stream.getTracks().forEach(track => track.stop());
     if (scriptProcessor) scriptProcessor.disconnect();
@@ -441,7 +489,6 @@ export default function App() {
           const outputAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
           let currentInput = '';
           let currentOutput = '';
-          // FIX: The callback keys for ai.live.connect must be lowercase (e.g., onopen, onmessage).
           const sessionPromise = startConversation(voiceSettings, {
               onopen: () => {
                   setIsConnecting(false);
@@ -458,21 +505,11 @@ export default function App() {
                   audioResourcesRef.current = { stream, inputAudioContext, outputAudioContext, scriptProcessor, source };
               },
               onmessage: async (message: LiveServerMessage) => {
-                  if (message.serverContent?.outputTranscription) {
-                      currentOutput += message.serverContent.outputTranscription.text;
-                      setModelTranscript(currentOutput);
-                  } else if (message.serverContent?.inputTranscription) {
-                      currentInput += message.serverContent.inputTranscription.text;
-                      setUserTranscript(currentInput);
-                  }
+                  if (message.serverContent?.outputTranscription) { currentOutput += message.serverContent.outputTranscription.text; setModelTranscript(currentOutput); }
+                  else if (message.serverContent?.inputTranscription) { currentInput += message.serverContent.inputTranscription.text; setUserTranscript(currentInput); }
                   if (message.serverContent?.turnComplete) {
-                      setTranscriptHistory(prev => [
-                          ...prev,
-                          { id: Date.now(), speaker: 'user', text: currentInput },
-                          { id: Date.now() + 1, speaker: 'model', text: currentOutput },
-                      ]);
-                      currentInput = ''; currentOutput = '';
-                      setUserTranscript(''); setModelTranscript('');
+                      setTranscriptHistory(prev => [...prev, { id: Date.now(), speaker: 'user', text: currentInput }, { id: Date.now() + 1, speaker: 'model', text: currentOutput }]);
+                      currentInput = ''; currentOutput = ''; setUserTranscript(''); setModelTranscript('');
                   }
                   const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
                   if (base64Audio) {
@@ -494,10 +531,7 @@ export default function App() {
                       liveAudioQueueRef.current.nextStartTime = 0;
                   }
               },
-              onerror: (e: ErrorEvent) => {
-                  setError("Conversation error. Please try again.");
-                  handleStopConversation();
-              },
+              onerror: (e: ErrorEvent) => { setError("Conversation error. Please try again."); handleStopConversation(); },
               onclose: (e: CloseEvent) => handleStopConversation(),
           });
           liveSessionRef.current = await sessionPromise;
@@ -511,12 +545,22 @@ export default function App() {
   const eventFlowActions = { onSpeak: handleSpeak, onGenerateScript: handleGenerateScript, onImproveScript: handleImproveScript, onDeleteScript: handleDeleteScript, onLinkCue: handleLinkCue, onRegenerateFullScript: handleRegenerateFullScript };
   const handleStatusChange = (newStatus: EventStatusType) => { setEventStatus(newStatus); setSuggestedStatus(null); };
 
+  const currentThemeColor = visualizerColorSchemes[visualizerSettings.colorScheme]?.base || '#facc15';
+  
+  const BackdropScreen = ({ content }: { content: BackdropContent | null }) => (
+    <div className="w-full h-full bg-black rounded-lg shadow-2xl overflow-hidden relative flex items-center justify-center text-gray-500" style={{ boxShadow: `0 8px 32px 0 ${currentThemeColor}33` }}>
+      {content?.type === 'image' && <img src={content.url} alt="Broadcast Backdrop" className="absolute inset-0 w-full h-full object-cover" />}
+      {content?.type === 'video' && <video src={content.url} autoPlay loop muted className="absolute inset-0 w-full h-full object-cover" />}
+      {content === null && <span className="font-orbitron z-10">BROADCAST BACKDROP</span>}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <header className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 border-b-2 border-yellow-500 pb-4">
+        <header className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 border-b-2 pb-4 transition-colors duration-500" style={{ borderColor: currentThemeColor }}>
           <div className="text-center sm:text-left">
-            <h1 className="font-orbitron text-4xl sm:text-5xl font-bold text-yellow-400 tracking-widest">
+            <h1 className="font-orbitron text-3xl sm:text-4xl lg:text-5xl font-bold tracking-widest transition-colors duration-500" style={{ color: currentThemeColor }}>
               OSCARS 2025: COMMAND CENTER
             </h1>
             <p className="text-gray-400 mt-2 text-lg">Live from the Dolby Theatre</p>
@@ -526,23 +570,33 @@ export default function App() {
           </div>
         </header>
         <main>
-          <div className="w-full h-48 sm:h-64 md:h-80 bg-black rounded-lg shadow-2xl shadow-yellow-500/20 mb-8 overflow-hidden relative">
-            <div className="absolute inset-0 flex">
-              <div className="w-1/3 border-r-2 border-dashed border-gray-700"></div>
-              <div className="w-1/3 border-r-2 border-dashed border-gray-700"></div>
-              <div className="w-1/3"></div>
+          <div className="grid grid-cols-12 gap-8 mb-8">
+            <div className="col-span-12 lg:col-span-8">
+              <div className="w-full aspect-video bg-black rounded-lg shadow-2xl overflow-hidden relative flex items-center justify-center text-gray-500" style={{ boxShadow: `0 8px 32px 0 ${currentThemeColor}33` }}>
+                  <div className="absolute inset-0 grid grid-cols-4 grid-rows-2 gap-px pointer-events-none z-10">
+                    {[...Array(8)].map((_, i) => (
+                        <div key={i} className="border border-black/30"></div>
+                    ))}
+                  </div>
+                  <BackdropScreen content={backdropMain} />
+              </div>
             </div>
-            <div className="absolute inset-0 flex items-center justify-center p-2">
-              <AudioVisualizer
-                analyser={analyser}
-                isPlaying={isPlaying || isLoading}
-                style={visualizerSettings.style}
-                colorScheme={visualizerColorSchemes[visualizerSettings.colorScheme]}
-              />
+            <div className="col-span-12 lg:col-span-4 flex flex-col gap-8">
+              <div className="w-full aspect-video bg-black rounded-lg shadow-2xl overflow-hidden relative" style={{ boxShadow: `0 8px 32px 0 ${currentThemeColor}33` }}>
+                <div className="absolute inset-0 flex items-center justify-center p-2">
+                  <AudioVisualizer
+                    analyser={analyser}
+                    isPlaying={isPlaying || isLoading}
+                    style={visualizerSettings.style}
+                    colorScheme={visualizerColorSchemes[visualizerSettings.colorScheme]}
+                  />
+                </div>
+                <div className="absolute top-2 left-4 font-orbitron text-xs text-red-500 opacity-70">LIVE BROADCAST</div>
+                <div className="absolute bottom-2 right-4 font-orbitron text-xs opacity-70" style={{ color: currentThemeColor }}>OSCAR CORE</div>
+              </div>
             </div>
-             <div className="absolute top-2 left-4 font-orbitron text-xs text-red-500 opacity-70">LIVE BROADCAST</div>
-             <div className="absolute bottom-2 right-4 font-orbitron text-xs text-yellow-400 opacity-70">OSCAR CORE</div>
           </div>
+          
           {error && (
             <div className="bg-red-800/50 border border-red-600 text-red-200 px-4 py-3 rounded-lg relative mb-6" role="alert">
               <strong className="font-bold">Error: </strong>
@@ -550,6 +604,7 @@ export default function App() {
               <button onClick={() => setError(null)} className="absolute top-0 bottom-0 right-0 px-4 py-3 font-bold">&times;</button>
             </div>
           )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
               <EventFlow 
@@ -562,18 +617,31 @@ export default function App() {
             <div className="flex flex-col gap-8">
               <EventFeed script={script} activeScriptId={activeScriptId} />
               <EventStatus currentStatus={eventStatus} onStatusChange={handleStatusChange} onSuggestStatus={handleSuggestStatus} suggestedStatus={suggestedStatus} isSuggesting={isAiModalLoading} />
-              <VisualizerControls settings={visualizerSettings} setSettings={setVisualizerSettings} onGenerateTheme={handleGenerateVisualizerTheme} colorSchemes={visualizerColorSchemes} />
+              <ThemeCreator
+                onGenerate={handleGenerateThemeAssets}
+                lastGeneratedAssets={lastGeneratedAssets}
+                videoStatus={videoGenerationStatus}
+                videoError={videoGenerationError}
+                isApiKeySelected={isApiKeySelected}
+                onSelectApiKey={handleSelectApiKey}
+                onSetBackdrop={(content, target) => handleSetBackdrop(content, target)}
+                onTriggerCue={triggerLightingCue}
+                onApplyTheme={(key) => setVisualizerSettings(prev => ({...prev, colorScheme: key}))}
+              />
+              <VisualizerControls settings={visualizerSettings} setSettings={setVisualizerSettings} colorSchemes={visualizerColorSchemes} />
               <Conversation 
                   isConnecting={isConnecting} isActive={isConversationActive} onStart={handleStartConversation} onStop={handleStopConversation}
                   userTranscript={userTranscript} modelTranscript={modelTranscript} history={transcriptHistory}
               />
               <VoiceControls settings={voiceSettings} setSettings={setVoiceSettings} />
+              <RemoteCommand onSendCommand={handleInjectScriptItem} />
               <DeviceScanner devices={devices} setDevices={setDevices} />
               <EquipmentController 
                   equipment={equipment} onToggle={handleEquipmentToggle} presets={presets} onLoadPreset={handleLoadPreset} onSavePreset={handleSavePreset}
                   onSimulateOffline={handleSimulateOffline} onDeletePreset={handleDeletePreset} onUpdatePreset={handleUpdatePreset}
                   onReorderPresets={handleReorderPresets} lightingCues={lightingCues} onTriggerCue={triggerLightingCue}
-                  onGetTroubleshooting={handleGetTroubleshooting} onGenerateCue={handleGenerateLightingCue}
+                  onGetTroubleshooting={handleGetTroubleshooting}
+                  onResearch={handleResearchEquipment}
               />
             </div>
           </div>
@@ -585,7 +653,25 @@ export default function App() {
         title={aiModalTitle}
         isLoading={isAiModalLoading}
       >
-        {aiModalContent}
+        {typeof aiModalContent === 'string' ? aiModalContent : (
+          <div>
+            <p>{aiModalContent.text}</p>
+            {aiModalContent.sources && aiModalContent.sources.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-600">
+                <h4 className="font-bold mb-2 text-sm text-gray-400">Sources:</h4>
+                <ul className="list-disc pl-5 space-y-1">
+                  {aiModalContent.sources.map((source, index) => (
+                    <li key={index} className="text-xs">
+                      <a href={source.uri} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">
+                        {source.title || source.uri}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </AIModal>
     </div>
   );

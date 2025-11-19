@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import type { Equipment, EquipmentPreset, LightingCue } from '../types';
 import { TrashIcon } from './icons/TrashIcon';
@@ -6,7 +7,7 @@ import { SaveIcon } from './icons/SaveIcon';
 import { DragHandleIcon } from './icons/DragHandleIcon';
 import { BotIcon } from './icons/BotIcon';
 import { SparkleIcon } from './icons/SparkleIcon';
-import { SpinnerIcon } from './icons/SpinnerIcon';
+import { GoogleIcon } from './icons/GoogleIcon';
 
 interface EquipmentControllerProps {
     equipment: Equipment[];
@@ -21,7 +22,7 @@ interface EquipmentControllerProps {
     lightingCues: LightingCue[];
     onTriggerCue: (name: string) => void;
     onGetTroubleshooting: (equipment: Equipment) => void;
-    onGenerateCue: (prompt: string) => Promise<void>;
+    onResearch: (equipment: Equipment) => void;
 }
 
 export const EquipmentController: React.FC<EquipmentControllerProps> = ({ 
@@ -37,14 +38,12 @@ export const EquipmentController: React.FC<EquipmentControllerProps> = ({
     lightingCues,
     onTriggerCue,
     onGetTroubleshooting,
-    onGenerateCue,
+    onResearch,
 }) => {
   const [newPresetName, setNewPresetName] = useState('');
   const [notifications, setNotifications] = useState<{id: string, message: string}[]>([]);
   const prevEquipmentRef = useRef<Equipment[]>(equipment);
   const [draggedItemIndex, setDraggedItemIndex] = useState<number | null>(null);
-  const [lightingCuePrompt, setLightingCuePrompt] = useState('');
-  const [isGeneratingCue, setIsGeneratingCue] = useState(false);
 
   useEffect(() => {
     const newlyOffline = equipment.filter(currentItem => {
@@ -92,14 +91,6 @@ export const EquipmentController: React.FC<EquipmentControllerProps> = ({
           onUpdatePreset(name);
       }
   };
-  
-  const handleGenerateCueClick = async () => {
-    if (!lightingCuePrompt.trim()) return;
-    setIsGeneratingCue(true);
-    await onGenerateCue(lightingCuePrompt);
-    setLightingCuePrompt('');
-    setIsGeneratingCue(false);
-  };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => { setDraggedItemIndex(index); e.dataTransfer.effectAllowed = 'move'; };
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); };
@@ -118,11 +109,12 @@ export const EquipmentController: React.FC<EquipmentControllerProps> = ({
       setDraggedItemIndex(null);
   };
   
-  const getTypeIcon = (type: 'Audio' | 'Lighting' | 'Video') => {
+  const getTypeIcon = (type: 'Audio' | 'Lighting' | 'Video' | 'AI') => {
     switch(type) {
         case 'Audio': return '🔊';
         case 'Lighting': return '💡';
         case 'Video': return '📺';
+        case 'AI': return '🤖';
     }
   }
 
@@ -150,15 +142,6 @@ export const EquipmentController: React.FC<EquipmentControllerProps> = ({
                     {cue.name}
                 </button>
             ))}
-        </div>
-        <div>
-            <label htmlFor="cue-generate" className="block text-sm font-medium text-gray-300 mb-1">Generate with AI</label>
-            <div className="flex space-x-2">
-                <input id="cue-generate" type="text" value={lightingCuePrompt} onChange={(e) => setLightingCuePrompt(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleGenerateCueClick()} placeholder="e.g., Dramatic winner spotlight" className="flex-grow bg-gray-700 text-white rounded-lg px-4 py-2 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500" />
-                <button onClick={handleGenerateCueClick} disabled={!lightingCuePrompt.trim() || isGeneratingCue} className="bg-purple-600 hover:bg-purple-500 disabled:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
-                    {isGeneratingCue ? <SpinnerIcon className="w-5 h-5"/> : <SparkleIcon className="w-5 h-5"/>}
-                </button>
-            </div>
         </div>
       </div>
 
@@ -193,14 +176,17 @@ export const EquipmentController: React.FC<EquipmentControllerProps> = ({
       <div className="mt-6 space-y-3">
         {equipment.map(item => (
           <div key={item.id} className={`p-3 rounded-lg flex justify-between items-center transition-all duration-300 ${item.status === 'Offline' ? 'bg-red-900/50 border border-red-700' : 'bg-gray-700/50'}`}>
-            <div className="flex items-center">
-              <span className="text-xl mr-3">{getTypeIcon(item.type)}</span>
-              <div>
-                <p className={`font-semibold transition-colors ${item.status === 'Offline' ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{item.name}</p>
-                <p className={`text-xs transition-colors font-bold ${item.status === 'Offline' ? 'text-red-400' : 'text-gray-400'}`}>{item.status === 'Offline' ? 'OFFLINE' : item.type}</p>
+            <div className="flex items-center overflow-hidden mr-2">
+              <span className="text-xl mr-3 flex-shrink-0">{getTypeIcon(item.type)}</span>
+              <div className="overflow-hidden">
+                <p className={`font-semibold truncate transition-colors ${item.status === 'Offline' ? 'text-gray-500 line-through' : 'text-gray-200'}`} title={item.name}>{item.name}</p>
+                <p className={`text-xs transition-colors font-bold ${item.status === 'Offline' ? 'text-red-400' : 'text-gray-400'}`} title={item.brand && item.model ? `${item.brand} ${item.model}` : item.type}>
+                  {item.brand && item.model ? `${item.brand} ${item.model}` : item.type}
+                </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-shrink-0">
+                <button onClick={() => onResearch(item)} className="p-2 rounded-full bg-gray-600 hover:bg-gray-500 transition-colors" title={`Research ${item.name}`}><GoogleIcon className="w-4 h-4 text-white"/></button>
                 {item.status === 'Offline' && (
                     <button onClick={() => onGetTroubleshooting(item)} className="p-2 rounded-full bg-blue-600 hover:bg-blue-500 transition-colors" title="Troubleshoot with AI"><BotIcon className="w-4 h-4 text-white"/></button>
                 )}
