@@ -75,7 +75,7 @@ export interface GeneratedImage {
     url: string; // data URL
 }
 
-// FIX: Add EditableImage type for image editing and video generation features.
+// FIX: Add missing EditableImage interface for components/ImageEditor.tsx and components/VideoGenerator.tsx
 export interface EditableImage {
     base64: string;
     mimeType: string;
@@ -105,4 +105,18 @@ export interface GroundingSource {
 export interface SearchResult {
     text: string;
     sources: GroundingSource[];
+}
+
+export interface SocialPost {
+    id: number;
+    author: string;
+    handle: string;
+    text: string;
+    avatar: string;
+}
+
+export interface SentimentAnalysisResult {
+    overallSentiment: 'Positive' | 'Negative' | 'Mixed' | 'Neutral';
+    keyTopics: string[];
+    summary: string;
 }

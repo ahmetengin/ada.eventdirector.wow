@@ -12,11 +12,12 @@ import { VisualizerControls } from './components/VisualizerControls';
 import { AIModal } from './components/AIModal';
 import { ThemeCreator } from './components/ThemeCreator';
 import { RemoteCommand } from './components/RemoteCommand';
-import { generateSpeech, generateTextStream, generateScript, startConversation, createPcmBlob, getTroubleshootingSteps, generateLightingCue, generateVisualizerTheme, suggestNextStatus, generateImageFromPrompt, generateVideoFromImage, getVideosOperationStatus, researchWithGoogleSearch } from './services/geminiService';
+import { SocialFeed } from './components/SocialFeed';
+import { generateSpeech, generateTextStream, generateScript, startConversation, createPcmBlob, getTroubleshootingSteps, generateLightingCue, generateVisualizerTheme, suggestNextStatus, generateImageFromPrompt, generateVideoFromImage, getVideosOperationStatus, researchWithGoogleSearch, analyzeSocialSentiment } from './services/geminiService';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { socket } from './services/socketService';
-import type { ScriptItem, Device, VoiceSettings, Equipment, EquipmentPreset, TranscriptEntry, EventStatus as EventStatusType, VisualizerSettings, LightingCue, VisualizerColorSchemeDetails, GeneratedImage, VideoGenerationStatus, BackdropContent, LastGeneratedAssets, BackdropTarget, SearchResult } from './types';
-import { INITIAL_SCRIPT, MOCK_EQUIPMENT, INITIAL_PRESETS, INITIAL_LIGHTING_CUES, INITIAL_VISUALIZER_COLOR_SCHEMES } from './constants';
+import type { ScriptItem, Device, VoiceSettings, Equipment, EquipmentPreset, TranscriptEntry, EventStatus as EventStatusType, VisualizerSettings, LightingCue, VisualizerColorSchemeDetails, GeneratedImage, VideoGenerationStatus, BackdropContent, LastGeneratedAssets, BackdropTarget, SearchResult, SocialPost, SentimentAnalysisResult } from './types';
+import { INITIAL_SCRIPT, MOCK_EQUIPMENT, INITIAL_PRESETS, INITIAL_LIGHTING_CUES, INITIAL_VISUALIZER_COLOR_SCHEMES, MOCK_SOCIAL_POSTS } from './constants';
 import type { LiveServerMessage } from '@google/genai';
 import { decode, decodeAudioData } from './utils';
 
@@ -52,6 +53,11 @@ export default function App() {
   const [isAiModalLoading, setIsAiModalLoading] = useState(false);
   const [suggestedStatus, setSuggestedStatus] = useState<string | null>(null);
 
+  // --- Social Feed State ---
+  const [socialPosts, setSocialPosts] = useState<SocialPost[]>([]);
+  const [sentimentAnalysis, setSentimentAnalysis] = useState<SentimentAnalysisResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   // --- Theme Creator & Backdrop State ---
   const [lastGeneratedAssets, setLastGeneratedAssets] = useState<LastGeneratedAssets>({});
   const [backdropMain, setBackdropMain] = useState<BackdropContent | null>(null);
@@ -81,6 +87,16 @@ export default function App() {
     nextStartTime: number,
     sources: Set<AudioBufferSourceNode>,
   }>({ nextStartTime: 0, sources: new Set() });
+
+  useEffect(() => {
+    // Simulate social posts appearing over time
+    const interval = setInterval(() => {
+      if (socialPosts.length < MOCK_SOCIAL_POSTS.length) {
+        setSocialPosts(prev => [...prev, MOCK_SOCIAL_POSTS[prev.length]]);
+      }
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [socialPosts]);
 
   useEffect(() => {
     if (window.aistudio) {
@@ -540,6 +556,21 @@ export default function App() {
           setIsConnecting(false);
       }
   }, [voiceSettings, handleStopConversation]);
+  
+  const handleAnalyzeSentiment = useCallback(async () => {
+    if (socialPosts.length === 0) return;
+    setIsAnalyzing(true);
+    setSentimentAnalysis(null);
+    setError(null);
+    try {
+        const analysis = await analyzeSocialSentiment(socialPosts.slice(-10)); // Analyze last 10 posts
+        setSentimentAnalysis(analysis);
+    } catch(err) {
+        setError("Could not analyze social media sentiment at this time.");
+    } finally {
+        setIsAnalyzing(false);
+    }
+  }, [socialPosts]);
 
   const eventFlowStatus = { isLoading, isPlaying, activeScriptId, isGeneratingScript, isRegeneratingScript, improvingScriptId };
   const eventFlowActions = { onSpeak: handleSpeak, onGenerateScript: handleGenerateScript, onImproveScript: handleImproveScript, onDeleteScript: handleDeleteScript, onLinkCue: handleLinkCue, onRegenerateFullScript: handleRegenerateFullScript };
@@ -628,6 +659,7 @@ export default function App() {
                 onTriggerCue={triggerLightingCue}
                 onApplyTheme={(key) => setVisualizerSettings(prev => ({...prev, colorScheme: key}))}
               />
+              <SocialFeed posts={socialPosts} analysis={sentimentAnalysis} onAnalyze={handleAnalyzeSentiment} isAnalyzing={isAnalyzing} />
               <VisualizerControls settings={visualizerSettings} setSettings={setVisualizerSettings} colorSchemes={visualizerColorSchemes} />
               <Conversation 
                   isConnecting={isConnecting} isActive={isConversationActive} onStart={handleStartConversation} onStop={handleStopConversation}

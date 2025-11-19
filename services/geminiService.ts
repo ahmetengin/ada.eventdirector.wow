@@ -1,11 +1,6 @@
 
-
-
-
-
 import { GoogleGenAI, Modality, Type, LiveServerMessage, Blob } from "@google/genai";
-// FIX: Add SearchResult and GroundingSource to imports for the new research function.
-import type { VoiceSettings, VoiceSpeed, Equipment, LightingCue, VisualizerColorSchemeDetails, EventStatus, ScriptItem, SearchResult, GroundingSource } from "../types";
+import type { VoiceSettings, VoiceSpeed, Equipment, LightingCue, VisualizerColorSchemeDetails, EventStatus, ScriptItem, SearchResult, GroundingSource, SocialPost, SentimentAnalysisResult } from "../types";
 import { encode } from "../utils";
 
 if (!process.env.API_KEY) {
@@ -14,34 +9,33 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
-function getSpeedInstruction(speed: VoiceSpeed): string {
+/**
+ * Converts the voice speed setting to a numeric rate for the API.
+ * @param speed The selected voice speed.
+ * @returns A numeric speaking rate.
+ */
+function convertSpeedToRate(speed: VoiceSpeed): number {
     switch (speed) {
-        case 'slow': return 'Speak slowly and clearly. ';
-        case 'fast': return 'Speak quickly and energetically. ';
-        default: return '';
+        case 'slow': return 0.8;
+        case 'fast': return 1.2;
+        default: return 1.0;
     }
-}
-
-function getPitchInstruction(pitch: number): string {
-    if (pitch <= -4.0) return 'Use a deep voice. ';
-    if (pitch >= 4.0) return 'Use a higher-pitched voice. ';
-    return '';
 }
 
 export async function generateSpeech(text: string, voiceSettings: VoiceSettings): Promise<string> {
   try {
-    const speedInstruction = getSpeedInstruction(voiceSettings.speed);
-    const pitchInstruction = getPitchInstruction(voiceSettings.pitch);
-    const fullText = `${speedInstruction}${pitchInstruction}${text}`;
-
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: fullText }] }],
+      contents: [{ parts: [{ text: text }] }], // Use the raw text, no instructions
       config: {
         responseModalities: [Modality.AUDIO],
+        // FIX: Moved pitch and speakingRate into voiceConfig. They are not direct properties of speechConfig.
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: voiceSettings.voiceName },
+            // Use structured parameters for pitch and speed
+            pitch: voiceSettings.pitch,
+            speakingRate: convertSpeedToRate(voiceSettings.speed),
           },
         },
       },
@@ -50,6 +44,7 @@ export async function generateSpeech(text: string, voiceSettings: VoiceSettings)
     const part = response?.candidates?.[0]?.content?.parts?.[0];
 
     if (part?.inlineData?.data) {
+      // A small amount of data might indicate a silent or failed audio generation
       if (part.inlineData.data.length < 1000) {
         console.warn(`[geminiService] Received very short audio data (length: ${part.inlineData.data.length}), which might be silent.`);
       }
@@ -68,7 +63,6 @@ export async function generateSpeech(text: string, voiceSettings: VoiceSettings)
 export async function generateTextStream(prompt: string, onChunk: (text: string) => void): Promise<void> {
   try {
     const response = await ai.models.generateContentStream({
-      // FIX: Use 'gemini-flash-lite-latest' as per the model naming guidelines.
       model: "gemini-flash-lite-latest",
       contents: prompt,
     });
@@ -123,7 +117,6 @@ export async function getTroubleshootingSteps(equipment: Equipment): Promise<str
     }
 }
 
-// FIX: Add researchWithGoogleSearch function to implement research functionality.
 export async function researchWithGoogleSearch(prompt: string): Promise<SearchResult> {
     try {
         const response = await ai.models.generateContent({
@@ -241,6 +234,35 @@ export async function suggestNextStatus(currentStatus: EventStatus, script: Scri
     }
 }
 
+export async function analyzeSocialSentiment(posts: SocialPost[]): Promise<SentimentAnalysisResult> {
+    const postsText = posts.map(p => `@${p.handle}: ${p.text}`).join('\n---\n');
+    const prompt = `You are a social media analyst for the Oscars. Analyze the sentiment of the following social media posts. Provide a summary of the audience's mood, identify 2-3 key topics or moments being discussed, and give an overall sentiment rating (Positive, Negative, Mixed, or Neutral). The response must be in JSON format.\n\nPOSTS:\n${postsText}`;
+    
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-3-pro-preview",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        overallSentiment: { type: Type.STRING, enum: ['Positive', 'Negative', 'Mixed', 'Neutral'] },
+                        keyTopics: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        summary: { type: Type.STRING }
+                    },
+                    required: ['overallSentiment', 'keyTopics', 'summary']
+                }
+            }
+        });
+        return JSON.parse(response.text);
+    } catch (error) {
+        console.error("Error in analyzeSocialSentiment:", error);
+        throw new Error("Failed to analyze social media sentiment.");
+    }
+}
+
+
 // --- Image & Video Generation ---
 export async function generateImageFromPrompt(prompt: string, aspectRatio: '16:9' | '9:16' = '16:9'): Promise<string> {
     try {
@@ -310,7 +332,6 @@ export async function getVideosOperationStatus(operation: any) {
 
 // --- Live Conversation Service ---
 
-// FIX: The callback keys for ai.live.connect must be all lowercase (e.g., onopen, onmessage).
 interface ConversationCallbacks { onopen: () => void; onmessage: (message: LiveServerMessage) => Promise<void>; onerror: (e: ErrorEvent) => void; onclose: (e: CloseEvent) => void; }
 
 export function startConversation(voiceSettings: VoiceSettings, callbacks: ConversationCallbacks) {

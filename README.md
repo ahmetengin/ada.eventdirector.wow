@@ -14,6 +14,10 @@ It leverages the power of the Google Gemini API to provide intelligent, low-late
 
 - **Main Broadcast Screen**: A central, multi-screen stage layout featuring an 8-panel LED video wall and two side screens that display AI-generated backdrops and videos, providing a visual anchor for the event.
 
+- **Live Social Feed & Sentiment Analysis**:
+  - **Real-time Feed**: Monitor a simulated live feed of social media posts about your event.
+  - **AI Sentiment Summary (`gemini-3-pro-preview`)**: With one click, get an AI-generated analysis of the audience's mood, key discussion points, and overall sentiment.
+
 - **AI-Powered Scripting**:
   - **Real-time Generation**: Create new script announcements on the fly with `gemini-2.5-flash-lite` for low-latency responses.
   - **Streaming Text**: Watch the AI write announcements word-by-word for a highly responsive feel.
@@ -31,7 +35,7 @@ It leverages the power of the Google Gemini API to provide intelligent, low-late
 
 - **Equipment & Lighting Control**:
   - **Simulated Control**: Manage a virtual rack of lighting, audio, and video equipment with realistic brand/model names.
-  - **Presets**: Save, load, update, reorder, and delete complex equipment configurations.
+  - **Presets**: Save, load, update, reorder, and delete complex equipment configurations, including a theatrical "Phantom of the Opera" preset.
   - **AI Troubleshooting**: When a device "goes offline," an AI expert (`gemini-3-pro-preview`) provides a step-by-step diagnostic checklist.
 
 - **Intelligent Event Management**:
@@ -44,7 +48,7 @@ It leverages the power of the Google Gemini API to provide intelligent, low-late
 
 - **Frontend**: React, TypeScript, Tailwind CSS
 - **AI**: Google Gemini API
-  - `gemini-3-pro-preview` for complex generation (scripts, lighting cues, themes, troubleshooting).
+  - `gemini-3-pro-preview` for complex generation (scripts, lighting cues, themes, troubleshooting, sentiment analysis).
   - `gemini-2.5-flash-lite` for fast, low-latency text generation.
   - `gemini-2.5-flash` with the `googleSearch` tool for grounded research.
   - `imagen-4.0-generate-001` for AI-powered image generation.

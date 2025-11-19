@@ -1,4 +1,4 @@
-import type { ScriptItem, Device, VoiceName, VoiceSpeed, Equipment, EquipmentPreset, EventStatus, LightingCue, VisualizerStyle, VisualizerColorScheme, VisualizerColorSchemeDetails } from './types';
+import type { ScriptItem, Device, VoiceName, VoiceSpeed, Equipment, EquipmentPreset, EventStatus, LightingCue, VisualizerStyle, VisualizerColorScheme, VisualizerColorSchemeDetails, SocialPost } from './types';
 import React from 'react';
 import { LiveIcon } from './components/icons/LiveIcon';
 import { IntermissionIcon } from './components/icons/IntermissionIcon';
@@ -46,6 +46,7 @@ export const INITIAL_PRESETS: EquipmentPreset[] = [
   { name: 'Award Ceremony Start', settings: { 'ctrl-light-01': true, 'ctrl-light-02': true, 'ctrl-aud-01': true, 'ctrl-vid-01': true, 'ctrl-stage-01': false, 'ctrl-ai-01': true, 'ctrl-ai-02': true, 'ctrl-vid-02': true, 'ctrl-vid-03': true, 'ctrl-vid-04': true, 'ctrl-vid-05': true } },
   { name: 'Panel Discussion', settings: { 'ctrl-light-01': true, 'ctrl-light-02': false, 'ctrl-aud-01': true, 'ctrl-vid-01': true, 'ctrl-stage-01': false, 'ctrl-ai-01': true, 'ctrl-ai-02': true, 'ctrl-vid-02': true, 'ctrl-vid-03': true, 'ctrl-vid-04': false, 'ctrl-vid-05': false } },
   { name: 'Intermission', settings: { 'ctrl-light-01': true, 'ctrl-light-02': false, 'ctrl-aud-01': true, 'ctrl-vid-01': false, 'ctrl-stage-01': false, 'ctrl-ai-01': true, 'ctrl-ai-02': true, 'ctrl-vid-02': true, 'ctrl-vid-03': true, 'ctrl-vid-04': true, 'ctrl-vid-05': true } },
+  { name: 'Phantom of the Opera', settings: { 'ctrl-light-01': false, 'ctrl-light-02': true, 'ctrl-aud-01': true, 'ctrl-vid-01': false, 'ctrl-stage-01': true, 'ctrl-ai-01': true, 'ctrl-ai-02': true, 'ctrl-vid-02': true, 'ctrl-vid-03': false, 'ctrl-vid-04': false, 'ctrl-vid-05': false } },
   { name: 'All Systems Off', settings: { 'ctrl-light-01': false, 'ctrl-light-02': false, 'ctrl-aud-01': false, 'ctrl-vid-01': false, 'ctrl-stage-01': false, 'ctrl-ai-01': false, 'ctrl-ai-02': false, 'ctrl-vid-02': false, 'ctrl-vid-03': false, 'ctrl-vid-04': false, 'ctrl-vid-05': false } }
 ];
 
@@ -75,7 +76,8 @@ export const INITIAL_LIGHTING_CUES: LightingCue[] = [
     { name: 'House Lights Dim', settings: { 'ctrl-light-01': true, 'ctrl-light-02': false } },
     { name: 'Stage Blackout', settings: { 'ctrl-light-01': false, 'ctrl-light-02': false } },
     { name: 'Winner Spotlight', settings: { 'ctrl-light-01': false, 'ctrl-light-02': true } },
-    { name: 'Audience Blinders', settings: { 'ctrl-light-01': true, 'ctrl-light-02': true } }
+    { name: 'Audience Blinders', settings: { 'ctrl-light-01': true, 'ctrl-light-02': true } },
+    { name: "Phantom's Lair", settings: { 'ctrl-light-01': false, 'ctrl-light-02': true } }
 ];
 
 export const INITIAL_VISUALIZER_COLOR_SCHEMES: Record<string, VisualizerColorSchemeDetails> = {
@@ -88,4 +90,13 @@ export const INITIAL_VISUALIZER_COLOR_SCHEMES: Record<string, VisualizerColorSch
 export const VISUALIZER_STYLE_OPTIONS: { value: VisualizerStyle; label: string }[] = [
     { value: 'wave', label: 'Waveform' },
     { value: 'bars', label: 'Frequency Bars' },
+];
+
+export const MOCK_SOCIAL_POSTS: SocialPost[] = [
+  { id: 1, author: 'CinephileMax', handle: 'MaxMovies', text: 'The opening monologue was hilarious! This is already better than last year. #Oscars2025', avatar: 'https://i.pravatar.cc/48?u=MaxMovies' },
+  { id: 2, author: 'AwardsWatch', handle: 'AwardsGuru', text: 'Cinematography award going to "Dune: Prophecy" was a total shocker. I thought "Starlight" had it for sure.', avatar: 'https://i.pravatar.cc/48?u=AwardsGuru' },
+  { id: 3, author: 'Jenny L.', handle: 'jennylovesfilms', text: "The fashion on the red carpet is absolutely stunning tonight. So many bold choices! ✨ #Oscars", avatar: 'https://i.pravatar.cc/48?u=jennylovesfilms' },
+  { id: 4, author: 'Tom Critic', handle: 'CriticalTom', text: 'Is it just me or is the pacing a bit slow tonight? Hopefully it picks up soon.', avatar: 'https://i.pravatar.cc/48?u=CriticalTom' },
+  { id: 5, author: 'Stacy', handle: 'stacyreacts', text: "OMG that musical performance was incredible! Gave me goosebumps. Best part of the show so far! #Oscars2025", avatar: 'https://i.pravatar.cc/48?u=stacyreacts' },
+  { id: 6, author: 'FilmBuffBrian', handle: 'brianwatches', text: "The 'In Memoriam' segment was beautifully done. A touching tribute to some true legends we lost. 💔", avatar: 'https://i.pravatar.cc/48?u=brianwatches' }
 ];
